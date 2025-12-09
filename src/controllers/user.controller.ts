@@ -216,7 +216,9 @@ export async function registerFromPayment(
       if (Number.isFinite(single) && single > 0) courseIds = [single];
     }
 
-    courseIds = Array.from(new Set(courseIds)).slice(0, 3);
+    const mandatoryCourseId = 2916425;
+    const prioritized = [mandatoryCourseId, ...courseIds.filter((id) => id !== mandatoryCourseId)];
+    courseIds = Array.from(new Set(prioritized)).slice(0, 3);
 
     for (const cid of courseIds) {
       await teachableService.enrollUser({ user_id: teachableUserId, course_id: cid } as any);
