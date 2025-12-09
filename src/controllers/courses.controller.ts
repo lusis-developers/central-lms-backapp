@@ -10,6 +10,44 @@ function parsePositiveNumber(value: any): number | undefined {
   return n;
 }
 
+function parseBoolean(value: any): boolean | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (v === "true") return true;
+    if (v === "false") return false;
+  }
+  return undefined;
+}
+
+export async function getCourses(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { name, is_published, author_bio_id, created_at, page, per } = (req.query || {}) as Record<string, any>;
+    const metadata = {
+      name: typeof name === "string" ? name : undefined,
+      is_published: parseBoolean(is_published),
+      author_bio_id: author_bio_id ? parsePositiveNumber(author_bio_id) : undefined,
+      created_at: typeof created_at === "string" ? created_at : undefined,
+      page: page ? parsePositiveNumber(page) : undefined,
+      per: per ? parsePositiveNumber(per) : undefined,
+    } as any;
+
+    const service = new TeachableCoursesService();
+    const { data } = await service.listCourses(metadata);
+    res.status(HttpStatusCode.Ok).send({ message: "Courses retrieved successfully.", courses: data });
+    return;
+  } catch (error: any) {
+    console.error("Error fetching courses", error);
+    res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
+    return;
+  }
+}
+
 async function resolveTeachableUserId(userId?: string, teachableUserId?: any): Promise<number | undefined> {
   const parsedTeachable = parsePositiveNumber(teachableUserId);
   if (parsedTeachable) return parsedTeachable;
