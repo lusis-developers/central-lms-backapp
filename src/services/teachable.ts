@@ -1,4 +1,4 @@
-import teachable, { CreateUserBodyParam, ShowUserMetadataParam, EnrollUserBodyParam, ShowCourseMetadataParam, ShowCourseEnrollmentsMetadataParam, ShowLectureMetadataParam, MarkLectureCompleteBodyParam, MarkLectureCompleteMetadataParam, CourseProgressMetadataParam, ListQuizzesMetadataParam, ShowQuizMetadataParam, ShowQuizResponsesMetadataParam, ShowVideoMetadataParam } from "@api/teachable";
+import teachable, { CreateUserBodyParam, ShowUserMetadataParam, EnrollUserBodyParam, ShowCourseMetadataParam, ShowCourseEnrollmentsMetadataParam, ShowLectureMetadataParam, MarkLectureCompleteBodyParam, MarkLectureCompleteMetadataParam, CourseProgressMetadataParam, ListQuizzesMetadataParam, ShowQuizMetadataParam, ShowQuizResponsesMetadataParam, ShowVideoMetadataParam, ListCoursesMetadataParam } from "@api/teachable";
 
 class ServiceError extends Error {
   status: number;
@@ -61,6 +61,10 @@ export class TeachableCoursesService {
       throw new ServiceError("Missing TEACHABLE_API_KEY env var", 400);
     }
     this.sdk.auth(key);
+  }
+
+  async listCourses(metadata?: ListCoursesMetadataParam): Promise<ReturnType<typeof teachable.listCourses>> {
+    return this.sdk.listCourses(metadata as any);
   }
 
   /**
