@@ -8,7 +8,7 @@ async function main() {
 
   await dbConnect();
 
-  initializeSchedulers()
+  initializeSchedulers();
 
   const { app, server } = createApp();
 
