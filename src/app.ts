@@ -17,16 +17,13 @@ export default function createApp() {
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:8101",
-    "https://automatizations.bakano.ec",
-    "https://brand.bakano.ec",
-    "https://testing-storybrand-frontend.bakano.ec"
   ];
 
   const corsOptions = {
     origin: function (origin: any, callback: any) {
-      const normalizedOrigin = origin?.replace(/\/$/, '');
-      console.log('🟡 Origin recibido:', origin);
-  
+      const normalizedOrigin = origin?.replace(/\/$/, "");
+      console.log("🟡 Origin recibido:", origin);
+
       if (!origin || whitelist.includes(normalizedOrigin)) {
         callback(null, true);
       } else {
@@ -36,7 +33,6 @@ export default function createApp() {
     },
     credentials: true,
   };
-  
 
   app.use(cors(corsOptions));
 
