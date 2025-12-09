@@ -37,7 +37,7 @@ export interface IUser {
   courses: CourseAccess[];
   careers: CareerAccess[];
   payments: Payment[];
+  transactions?: Types.ObjectId[];
   createdAt?: Date;
   updatedAt?: Date;
 }
-
