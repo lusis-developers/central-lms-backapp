@@ -1,4 +1,5 @@
 import teachable, { CreateUserBodyParam, ShowUserMetadataParam, EnrollUserBodyParam, ShowCourseMetadataParam, ShowCourseEnrollmentsMetadataParam, ShowLectureMetadataParam, MarkLectureCompleteBodyParam, MarkLectureCompleteMetadataParam, CourseProgressMetadataParam, ListQuizzesMetadataParam, ShowQuizMetadataParam, ShowQuizResponsesMetadataParam, ShowVideoMetadataParam } from "@api/teachable";
+import axios, { AxiosResponse } from "axios";
 
 class ServiceError extends Error {
   status: number;
@@ -135,5 +136,3 @@ export class TeachableCoursesService {
     return this.sdk.showVideo(metadata);
   }
 }
-
-export default teachable;
