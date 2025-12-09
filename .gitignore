@@ -144,4 +144,7 @@ dist
 credentials
 pnpm-lock****
 
+# Ignore local generated API SDKs
+.api/
+
 # End of https://www.toptal.com/developers/gitignore/api/node
