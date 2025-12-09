@@ -48,6 +48,7 @@ const UserSchema = new Schema<IUser>(
     courses: { type: [CourseAccessSchema], default: [] },
     careers: { type: [CareerAccessSchema], default: [] },
     payments: { type: [PaymentSchema], default: [] },
+    transactions: { type: [Schema.Types.ObjectId], ref: "transactions", default: [] },
   },
   { timestamps: true, versionKey: false },
 );
@@ -62,4 +63,3 @@ UserSchema.pre("save", async function (next) {
 });
 
 export const UserModel = model<IUser>("users", UserSchema);
-
