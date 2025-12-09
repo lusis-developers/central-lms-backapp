@@ -174,10 +174,10 @@ export async function registerFromPayment(
       if (parts.length >= 3) name = parts[parts.length - 2];
     }
 
-    const password = randomPassword(12);
-    const user = await models.users.create({ name, email, password });
+  const password = randomPassword(12);
+  const user = await models.users.create({ name, email, password });
 
-    if (transactionId || amount || currency) {
+  if (transactionId || amount || currency) {
       user.payments.push({
         provider: "other",
         amount: Number(amount || 0),
@@ -187,10 +187,49 @@ export async function registerFromPayment(
         createdAt: new Date(),
       });
       await user.save();
+  }
+
+  const teachableService = new TeachableUsersService();
+  const teachableRes = await teachableService.createUser({ name, email, password } as any);
+  const teachableUserId = (teachableRes as any)?.data?.id ?? (teachableRes as any)?.data?.user?.id;
+
+  if (typeof teachableUserId === "number") {
+    user.teachableUserId = teachableUserId;
+    await user.save();
+
+    const bodyCourseIds = Array.isArray((payload as any)?.courseIds) ? (payload as any).courseIds : undefined;
+    const envCourseIdsRaw = process.env.TEACHABLE_DEFAULT_COURSE_IDS;
+    const envSingle = process.env.TEACHABLE_DEFAULT_COURSE_ID;
+
+    let courseIds: number[] = [];
+    if (bodyCourseIds) {
+      courseIds = bodyCourseIds
+        .map((v: any) => Number(v))
+        .filter((n: number) => Number.isFinite(n) && n > 0);
+    } else if (envCourseIdsRaw && envCourseIdsRaw.trim() !== "") {
+      courseIds = envCourseIdsRaw
+        .split(",")
+        .map(s => Number(s.trim()))
+        .filter((n: number) => Number.isFinite(n) && n > 0);
+    } else if (envSingle && String(envSingle).trim() !== "") {
+      const single = Number(envSingle);
+      if (Number.isFinite(single) && single > 0) courseIds = [single];
     }
 
-    const emailService = new EmailService();
-    await emailService.sendTemporaryPassword(email, name, password);
+    courseIds = Array.from(new Set(courseIds)).slice(0, 3);
+
+    for (const cid of courseIds) {
+      await teachableService.enrollUser({ user_id: teachableUserId, course_id: cid } as any);
+      const exists = (user.courses || []).some((c: any) => Number(c.teachableCourseId) === Number(cid));
+      if (!exists) {
+        user.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
+      }
+    }
+    await user.save();
+  }
+
+  const emailService = new EmailService();
+  await emailService.sendTemporaryPassword(email, name, password);
 
     const safeUser = {
       _id: user._id,
