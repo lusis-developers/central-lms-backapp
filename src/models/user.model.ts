@@ -45,6 +45,7 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true, index: true },
     password: { type: String, required: true },
     teachableUserId: { type: Number },
+    points: { type: Number, default: 0 },
     courses: { type: [CourseAccessSchema], default: [] },
     careers: { type: [CareerAccessSchema], default: [] },
     payments: { type: [PaymentSchema], default: [] },
