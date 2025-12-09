@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "apis": [
+    {
+      "identifier": "teachable",
+      "source": "@teachable/v1.1#zs42jfm1ziq55k",
+      "integrity": "sha512-Hh90q8mFXWnciDZ/qwHX113gjm7d9zIj5q1yOtP0u4V/Vrl9XUbWg7T8MYGCTiEcQpdwxc4EdOcFOnq8dF/Sfw==",
+      "installerVersion": "6.1.3"
+    }
+  ]
+}
