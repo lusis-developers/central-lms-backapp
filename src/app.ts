@@ -17,6 +17,7 @@ export default function createApp() {
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:8101",
+    "https://fudmaster-testing-frontend.fudmaster.com.ec",
   ];
 
   const corsOptions = {
@@ -44,7 +45,7 @@ export default function createApp() {
   app.use(express.json({ limit: "50mb" }));
 
   app.get("/", (_req, res: Response) => {
-    res.send("BAKANO MVP STORYBRAND IS ALIVEEEEEEE:)");
+    res.send("fudmaster backend IS ALIVEEEEEEE:)");
   });
 
   routerApi(app);
