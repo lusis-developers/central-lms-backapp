@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { HttpStatusCode } from "axios";
 import { models } from "../models";
+import { TeachableUsersService } from "../services/teachable";
 
 export async function createUser(
   req: Request,
@@ -22,6 +23,28 @@ export async function createUser(
     }
 
     const user = await models.users.create({ name, email, password });
+
+    const teachableService = new TeachableUsersService();
+    const teachableRes = await teachableService.createUser({ name, email, password } as any);
+    const teachableUserId = (teachableRes as any)?.data?.id ?? (teachableRes as any)?.data?.user?.id;
+
+    if (typeof teachableUserId === "number") {
+      user.teachableUserId = teachableUserId;
+      await user.save();
+
+      const requestedCourseId = req.body?.courseId;
+      const defaultCourseId = process.env.TEACHABLE_DEFAULT_COURSE_ID;
+      const courseIdValue = requestedCourseId ?? defaultCourseId;
+
+      if (courseIdValue !== undefined && courseIdValue !== null && String(courseIdValue).trim() !== "") {
+        const courseIdNumber = Number(courseIdValue);
+        if (!Number.isNaN(courseIdNumber) && courseIdNumber > 0) {
+          await teachableService.enrollUser({ user_id: teachableUserId, course_id: courseIdNumber } as any);
+          user.courses.push({ teachableCourseId: courseIdNumber, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
+          await user.save();
+        }
+      }
+    }
 
     const safeUser = {
       _id: user._id,
