@@ -34,6 +34,7 @@ export interface IUser {
   email: string;
   password: string;
   teachableUserId?: number;
+  points?: number;
   courses: CourseAccess[];
   careers: CareerAccess[];
   payments: Payment[];
