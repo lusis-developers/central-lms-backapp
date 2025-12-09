@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   getCourses,
+  getEnrolledCoursesForUser,
   enrollUserToCourse,
   getCourseById,
   getCourseEnrollments,
@@ -16,6 +17,7 @@ import {
 const coursesRouter = Router();
 
 coursesRouter.get("/", getCourses);
+coursesRouter.get("/enrolled/:userId", getEnrolledCoursesForUser);
 coursesRouter.get("/:courseId", getCourseById);
 coursesRouter.get("/:courseId/enrollments", getCourseEnrollments);
 coursesRouter.post("/:courseId/enroll", enrollUserToCourse);
