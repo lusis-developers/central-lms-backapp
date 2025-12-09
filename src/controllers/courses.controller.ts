@@ -48,6 +48,70 @@ export async function getCourses(
   }
 }
 
+export async function getEnrolledCoursesForUser(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req.params;
+    const { teachableUserId } = (req.query || {}) as Record<string, any>;
+
+    let courseIds: number[] = [];
+
+    if (userId && Types.ObjectId.isValid(userId)) {
+      const user = await models.users.findById(userId).lean();
+      if (!user) {
+        res.status(HttpStatusCode.NotFound).send({ message: "User not found." });
+        return;
+      }
+      courseIds = (user.courses || [])
+        .filter((c: any) => c && c.status === "active")
+        .map((c: any) => Number(c.teachableCourseId))
+        .filter((n: number) => Number.isFinite(n) && n > 0);
+    } else {
+      const tId = parsePositiveNumber(teachableUserId);
+      if (!tId) {
+        res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. A valid userId or teachableUserId is required." });
+        return;
+      }
+      const usersService = new TeachableUsersService();
+      const { data } = await usersService.showUser({ user_id: tId } as any);
+      const enrollments = (data as any)?.enrollments || [];
+      courseIds = enrollments
+        .map((e: any) => Number(e?.course_id))
+        .filter((n: number) => Number.isFinite(n) && n > 0);
+    }
+
+    courseIds = Array.from(new Set(courseIds));
+
+    if (courseIds.length === 0) {
+      res.status(HttpStatusCode.Ok).send({ message: "No enrolled courses found.", courses: [] });
+      return;
+    }
+
+    const service = new TeachableCoursesService();
+    const results = await Promise.all(
+      courseIds.map(async (cid) => {
+        try {
+          const { data } = await service.showCourse({ course_id: cid } as any);
+          return data;
+        } catch (_err) {
+          return null as any;
+        }
+      }),
+    );
+    const courses = results.filter((r: any) => r != null);
+
+    res.status(HttpStatusCode.Ok).send({ message: "Enrolled courses retrieved successfully.", courses });
+    return;
+  } catch (error: any) {
+    console.error("Error fetching enrolled courses", error);
+    res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
+    return;
+  }
+}
+
 async function resolveTeachableUserId(userId?: string, teachableUserId?: any): Promise<number | undefined> {
   const parsedTeachable = parsePositiveNumber(teachableUserId);
   if (parsedTeachable) return parsedTeachable;
