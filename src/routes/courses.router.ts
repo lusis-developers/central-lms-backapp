@@ -12,6 +12,7 @@ import {
   getQuizById,
   getQuizResponses,
   getVideoById,
+  getNextVideo,
 } from "../controllers/courses.controller";
 
 const coursesRouter = Router();
@@ -28,5 +29,6 @@ coursesRouter.get("/:courseId/lectures/:lectureId/quizzes", getLectureQuizzes);
 coursesRouter.get("/:courseId/lectures/:lectureId/quizzes/:quizId", getQuizById);
 coursesRouter.get("/:courseId/lectures/:lectureId/quizzes/:quizId/responses", getQuizResponses);
 coursesRouter.get("/:courseId/lectures/:lectureId/videos/:videoId", getVideoById);
+coursesRouter.get("/:courseId/lectures/:lectureId/videos/:videoId/next", getNextVideo);
 
 export default coursesRouter;
