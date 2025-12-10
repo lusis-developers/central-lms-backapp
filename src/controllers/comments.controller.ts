@@ -42,6 +42,9 @@ export async function createComment(
     const pointsService = new PointsService();
     await pointsService.awardCommentPoint(userId);
 
+    const user = await models.users.findById(userId).lean();
+    const points = Number((user as any)?.points || 0);
+    res.setHeader("X-User-Points", String(points));
     res.status(HttpStatusCode.Created).send({ message: "Comment created successfully.", comment });
     return;
   } catch (error: any) {
@@ -83,6 +86,9 @@ export async function replyToComment(
     const pointsService = new PointsService();
     await pointsService.awardCommentPoint(userId);
 
+    const user = await models.users.findById(userId).lean();
+    const points = Number((user as any)?.points || 0);
+    res.setHeader("X-User-Points", String(points));
     res.status(HttpStatusCode.Created).send({ message: "Reply created successfully.", reply });
     return;
   } catch (error: any) {
@@ -116,6 +122,11 @@ export async function likeComment(
       return;
     }
 
+    const userDoc = await models.users.findById(userId).lean().catch(() => null);
+    if (userDoc) {
+      const points = Number((userDoc as any)?.points || 0);
+      res.setHeader("X-User-Points", String(points));
+    }
     res.status(HttpStatusCode.NoContent).send({ message: "Comment liked successfully." });
     return;
   } catch (error: any) {
@@ -143,6 +154,11 @@ export async function unlikeComment(
       { $pull: { likes: new Types.ObjectId(userId) } },
     );
 
+    const userDoc = await models.users.findById(userId).lean().catch(() => null);
+    if (userDoc) {
+      const points = Number((userDoc as any)?.points || 0);
+      res.setHeader("X-User-Points", String(points));
+    }
     res.status(HttpStatusCode.NoContent).send({ message: "Comment unliked successfully." });
     return;
   } catch (error: any) {
@@ -254,4 +270,3 @@ export async function getCommentReplies(
     return;
   }
 }
-
