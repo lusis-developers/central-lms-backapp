@@ -414,3 +414,86 @@ export async function getVideoById(
     return;
   }
 }
+
+export async function getNextVideo(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { courseId, lectureId, videoId } = req.params;
+    const courseIdNum = parsePositiveNumber(courseId);
+    const lectureIdNum = parsePositiveNumber(lectureId);
+    const videoIdNum = parsePositiveNumber(videoId);
+    if (!courseIdNum || !lectureIdNum || !videoIdNum) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid parameter. Valid courseId, lectureId and videoId are required." });
+      return;
+    }
+
+    const service = new TeachableCoursesService();
+    const { data: lectureData } = await service.showLecture({ course_id: courseIdNum, lecture_id: lectureIdNum } as any);
+
+    function extractCandidates(obj: any): Array<{ id: number; position?: number }> {
+      const out: Array<{ id: number; position?: number }> = [];
+      if (!obj || typeof obj !== "object") return out;
+      for (const key of Object.keys(obj)) {
+        const val = (obj as any)[key];
+        if (Array.isArray(val)) {
+          const keyLower = key.toLowerCase();
+          const looksLikeVideos = keyLower.includes("video");
+          if (looksLikeVideos) {
+            for (const item of val) {
+              const id = Number((item as any)?.id);
+              const position = Number((item as any)?.position);
+              if (Number.isFinite(id) && id > 0) {
+                out.push({ id, position: Number.isFinite(position) ? position : undefined });
+              }
+            }
+          } else {
+            // Scan nested arrays for items with type: 'video'
+            for (const item of val) {
+              const type = String((item as any)?.type || "").toLowerCase();
+              const id = Number((item as any)?.id);
+              const position = Number((item as any)?.position);
+              if (type.includes("video") && Number.isFinite(id) && id > 0) {
+                out.push({ id, position: Number.isFinite(position) ? position : undefined });
+              }
+            }
+          }
+        } else if (val && typeof val === "object") {
+          out.push(...extractCandidates(val));
+        }
+      }
+      return out;
+    }
+
+    let videos = extractCandidates(lectureData);
+    if (videos.length === 0) {
+      res.status(HttpStatusCode.NotFound).send({ message: "No videos found in lecture." });
+      return;
+    }
+
+    videos = videos.sort((a, b) => {
+      const pa = a.position ?? Number.MAX_SAFE_INTEGER;
+      const pb = b.position ?? Number.MAX_SAFE_INTEGER;
+      if (pa !== pb) return pa - pb;
+      return a.id - b.id;
+    });
+
+    const idx = videos.findIndex(v => Number(v.id) === Number(videoIdNum));
+    const next = idx >= 0 ? videos[idx + 1] : videos.find(v => v.id > videoIdNum);
+
+    if (!next) {
+      res.status(HttpStatusCode.Ok).send({ message: "No next video available.", next: null });
+      return;
+    }
+
+    const { data: nextData } = await service.showVideo({ course_id: courseIdNum, lecture_id: lectureIdNum, video_id: next.id } as any);
+    res.status(HttpStatusCode.Ok).send({ message: "Next video retrieved successfully.", next: nextData });
+    return;
+  } catch (error: any) {
+    console.error("Error fetching next video", error);
+    res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
+    return;
+  }
+}
