@@ -113,6 +113,42 @@ export async function getUserById(
   }
 }
 
+export async function checkUserByEmail(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { email } = (req.query || {}) as Record<string, any>;
+    const value = typeof email === "string" ? email.trim() : "";
+    if (!value) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid parameter. A valid email is required." });
+      return;
+    }
+
+    const user = await models.users.findOne({ email: value }).lean();
+    if (!user) {
+      res.status(HttpStatusCode.Ok).send({ message: "User not found.", exists: false });
+      return;
+    }
+
+    const safeUser = {
+      _id: user._id,
+      email: user.email,
+      teachableUserId: user.teachableUserId,
+      createdAt: (user as any).createdAt,
+      updatedAt: (user as any).updatedAt,
+    };
+
+    res.status(HttpStatusCode.Ok).send({ message: "User exists.", exists: true, user: safeUser });
+    return;
+  } catch (error) {
+    console.error("Error checking user email", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
 export async function loginUser(
   req: Request,
   res: Response,
