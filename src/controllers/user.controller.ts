@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { HttpStatusCode } from "axios";
 import { models } from "../models";
+import { Types } from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { TeachableUsersService } from "../services/teachable";
@@ -65,6 +66,48 @@ export async function createUser(
     return;
   } catch (error) {
     console.error("Error creating user", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
+export async function getUserById(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req.params as Record<string, string>;
+
+    if (!userId || !Types.ObjectId.isValid(userId)) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid parameter. A valid userId is required." });
+      return;
+    }
+
+    const user = await models.users.findById(userId).lean();
+    if (!user) {
+      res.status(HttpStatusCode.NotFound).send({ message: "User not found." });
+      return;
+    }
+
+    const safeUser = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      teachableUserId: user.teachableUserId,
+      points: user.points,
+      courses: user.courses,
+      careers: user.careers,
+      payments: user.payments,
+      transactions: user.transactions,
+      createdAt: (user as any).createdAt,
+      updatedAt: (user as any).updatedAt,
+    };
+
+    res.status(HttpStatusCode.Ok).send({ message: "User retrieved successfully.", user: safeUser });
+    return;
+  } catch (error) {
+    console.error("Error fetching user", error);
     res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
     return;
   }
