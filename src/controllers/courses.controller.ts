@@ -166,6 +166,92 @@ export async function enrollUserToCourse(
   }
 }
 
+export async function enrollUserToAllCourses(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = (req.params || {}) as Record<string, any>;
+    const { teachableUserId } = (req.query || {}) as Record<string, any>;
+
+    const finalTeachableUserId = await resolveTeachableUserId(userId, teachableUserId);
+    if (!finalTeachableUserId) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. A valid teachableUserId or userId is required." });
+      return;
+    }
+
+    const coursesService = new TeachableCoursesService();
+    const usersService = new TeachableUsersService();
+
+    const perDefault = 200;
+    let page = 1;
+    const collectedIds: number[] = [];
+
+    while (true) {
+      let data: any[] = [];
+      try {
+        const resCourses = await coursesService.listCourses({ page, per: perDefault } as any);
+        data = (resCourses as any)?.data ?? [];
+      } catch (_err) {
+        break;
+      }
+      const ids = (Array.isArray(data) ? data : [])
+        .map((c: any) => Number((c as any)?.id))
+        .filter((n: number) => Number.isFinite(n) && n > 0);
+      if (ids.length === 0) break;
+      collectedIds.push(...ids);
+      if (ids.length < perDefault) break;
+      page += 1;
+    }
+
+    const uniqueCourseIds = Array.from(new Set(collectedIds));
+
+    if (uniqueCourseIds.length === 0) {
+      res.status(HttpStatusCode.Ok).send({ message: "No courses available to enroll.", enrolledCourseIds: [], failedCourseIds: [] });
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      uniqueCourseIds.map(async (cid) => {
+        await usersService.enrollUser({ user_id: finalTeachableUserId, course_id: cid } as any);
+        return cid;
+      }),
+    );
+
+    const enrolledCourseIds: number[] = [];
+    const failedCourseIds: number[] = [];
+    for (const r of results) {
+      if (r.status === "fulfilled") enrolledCourseIds.push(r.value as number);
+      else {
+        const reason: any = (r as any).reason;
+        const cid = Number(reason?.course_id ?? reason?.metadata?.course_id);
+        if (Number.isFinite(cid) && cid > 0) failedCourseIds.push(cid);
+      }
+    }
+
+    if (userId && Types.ObjectId.isValid(userId)) {
+      const localUser = await models.users.findById(userId);
+      if (localUser) {
+        for (const cid of enrolledCourseIds) {
+          const exists = (localUser.courses || []).some((c: any) => Number(c.teachableCourseId) === Number(cid));
+          if (!exists) {
+            localUser.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
+          }
+        }
+        await localUser.save();
+      }
+    }
+
+    res.status(HttpStatusCode.Ok).send({ message: "User enrolled in all courses successfully.", enrolledCourseIds, failedCourseIds });
+    return;
+  } catch (error: any) {
+    console.error("Error enrolling user in all courses", error);
+    res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
+    return;
+  }
+}
+
 export async function getCourseById(
   req: Request,
   res: Response,
