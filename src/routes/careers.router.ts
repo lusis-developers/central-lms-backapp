@@ -12,4 +12,5 @@ careersRouter.delete("/:careerId/courses/:courseId", removeCourseFromCareer);
 export default careersRouter;
 careersRouter.post("/:careerId/assign/:userId", assignCareerToUser);
 careersRouter.post("/:careerId/enroll/:userId", enrollUserToCareerCourses);
+careersRouter.post("/:careerId/join/:userId", enrollUserToCareerCourses);
 careersRouter.get("/user/:userId", getUserCareers);
