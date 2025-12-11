@@ -3,6 +3,7 @@ import {
   getCourses,
   getEnrolledCoursesForUser,
   enrollUserToCourse,
+  enrollUserToAllCourses,
   getCourseById,
   getCourseEnrollments,
   getLectureById,
@@ -19,6 +20,7 @@ const coursesRouter = Router();
 
 coursesRouter.get("/", getCourses);
 coursesRouter.get("/enrolled/:userId", getEnrolledCoursesForUser);
+coursesRouter.post("/enroll-all/:userId", enrollUserToAllCourses);
 coursesRouter.get("/:courseId", getCourseById);
 coursesRouter.get("/:courseId/enrollments", getCourseEnrollments);
 coursesRouter.post("/:courseId/enroll", enrollUserToCourse);
