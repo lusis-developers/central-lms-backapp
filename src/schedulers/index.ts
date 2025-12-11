@@ -83,6 +83,10 @@ async function enrollMissingCoursesForAllUsers(): Promise<void> {
 }
 
 export const initializeSchedulers = () => {
+  const enabled = String(process.env.ENABLE_AUTO_ENROLL_SCHEDULER || "")
+    .trim()
+    .toLowerCase() === "true";
+  if (!enabled) return;
   const intervalMs = Number(process.env.SCHEDULER_ENROLL_INTERVAL_MS || 1000 * 60 * 30);
   setInterval(() => {
     enrollMissingCoursesForAllUsers().catch(() => {});
