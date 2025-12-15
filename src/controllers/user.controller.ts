@@ -7,7 +7,7 @@ import jwt from "jsonwebtoken";
 import { TeachableUsersService } from "../services/teachable";
 import { EmailService } from "../services/email.service";
 import type { IUser, CourseAccess } from "../types/user";
-import type { CreateUserBodyParam, EnrollUserBodyParam } from "@api/teachable";
+import type { CreateUserBodyParam, EnrollUserBodyParam } from "@api/teachable/types";
 
 type CreateUserRequestBody = {
   name?: string;

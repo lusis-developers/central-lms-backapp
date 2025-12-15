@@ -12,7 +12,7 @@ import type { CreateUserBodyParam,
   ShowQuizResponsesMetadataParam,
   ShowVideoMetadataParam,
   ListCoursesMetadataParam 
-} from "@api/teachable";
+} from "@api/teachable/types";
 type FetchResponse<TStatus = any, TData = any> = { status: TStatus; data: TData };
 
 type TeachableSDK = {
