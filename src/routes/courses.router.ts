@@ -16,15 +16,23 @@ import {
   getVideoById,
   getNextVideo,
 } from "../controllers/courses.controller";
+import { createQuiz, getQuizzesByCourse, getQuizByIdController, deleteQuiz, submitQuiz } from "../controllers/quizzes.controller";
 
 const coursesRouter = Router();
 
-coursesRouter.get("/", getCourses);
-coursesRouter.get("/enrolled/:userId", getEnrolledCoursesForUser);
+// ADMIN endpoints
+// Create and manage enrollments at scale, and manage course quizzes
 coursesRouter.post("/enroll-all/:userId", enrollUserToAllCourses);
 coursesRouter.post("/enroll-all-users", enrollAllUsersToAllCourses);
-coursesRouter.get("/:courseId", getCourseById);
 coursesRouter.get("/:courseId/enrollments", getCourseEnrollments);
+coursesRouter.post("/:courseId/quizzes", createQuiz);
+coursesRouter.delete("/:courseId/quizzes/:quizId", deleteQuiz);
+
+// USER endpoints
+// Discover courses, enroll, consume content, and take quizzes
+coursesRouter.get("/", getCourses);
+coursesRouter.get("/enrolled/:userId", getEnrolledCoursesForUser);
+coursesRouter.get("/:courseId", getCourseById);
 coursesRouter.post("/:courseId/enroll", enrollUserToCourse);
 coursesRouter.post("/:courseId/join", enrollUserToCourse);
 coursesRouter.get("/:courseId/lectures/:lectureId", getLectureById);
@@ -35,5 +43,14 @@ coursesRouter.get("/:courseId/lectures/:lectureId/quizzes/:quizId", getQuizById)
 coursesRouter.get("/:courseId/lectures/:lectureId/quizzes/:quizId/responses", getQuizResponses);
 coursesRouter.get("/:courseId/lectures/:lectureId/videos/:videoId", getVideoById);
 coursesRouter.get("/:courseId/lectures/:lectureId/videos/:videoId/next", getNextVideo);
+
+
+// User quiz endpoints (public output; correct answers are not returned)
+// List quizzes available for a course
+coursesRouter.get("/:courseId/quizzes", getQuizzesByCourse);
+// Get a single quiz (without correctIndex for each question)
+coursesRouter.get("/:courseId/quizzes/:quizId", getQuizByIdController);
+// Submit answers to a quiz for evaluation
+coursesRouter.post("/:courseId/quizzes/:quizId/submit", submitQuiz);
 
 export default coursesRouter;
