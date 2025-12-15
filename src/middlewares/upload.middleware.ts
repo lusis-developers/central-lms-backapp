@@ -1,12 +1,13 @@
 import multer from "multer";
+import type { Request } from "express";
 import path from "path";
 import crypto from "crypto";
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
+  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
     cb(null, "uploads/");
   },
-  filename: (req, file, cb) => {
+  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     const uniqueSuffix =
       Date.now() + "-" + crypto.randomBytes(6).toString("hex");
     cb(
