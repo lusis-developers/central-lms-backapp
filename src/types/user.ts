@@ -35,6 +35,21 @@ export interface IUser {
   password: string;
   teachableUserId?: number;
   points?: number;
+  gender?: "male" | "female" | "prefer_not_to_say" | "other";
+  genderOther?: string | null;
+  dateOfBirth?: Date | null;
+  heardAboutUs?:
+    | "social_media_ad"
+    | "friend_colleague"
+    | "search_engine"
+    | "online_article_blog"
+    | "youtube_video"
+    | "podcast"
+    | "event_webinar"
+    | "email_campaign"
+    | "teachable_marketplace"
+    | "other";
+  heardAboutUsOther?: string | null;
   courses: CourseAccess[];
   careers: CareerAccess[];
   payments: Payment[];

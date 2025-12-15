@@ -15,9 +15,10 @@ export class EmailService {
   async sendTemporaryPassword(to: string, name: string, password: string): Promise<void> {
     const loginLink = `${process.env.FRONTEND_URL || "https://fudmaster.com.ec"}/login`;
     const html = await generateEmailOfUserPassword(name, to, password, loginLink);
+    const from = (process.env.RESEND_FROM_EMAIL?.trim() || "no-reply@fudmaster.com.ec");
     const { error } = await this.resend.emails.send({
       to,
-      from: "no-reply@fudmaster.com.ec",
+      from,
       subject: "Your Fudmasters account",
       html,
     });
