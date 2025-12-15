@@ -526,3 +526,56 @@ export async function updateUser(
     return;
   }
 }
+
+export async function changePassword(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req.params as { userId: string };
+    const { currentPassword, newPassword } = (req.body || {}) as { currentPassword?: string; newPassword?: string };
+
+    if (!userId || !Types.ObjectId.isValid(userId)) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid parameter. A valid userId is required." });
+      return;
+    }
+
+    if (!currentPassword || !newPassword) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. currentPassword and newPassword are required." });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. newPassword must be at least 8 characters." });
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. New password must be different from current password." });
+      return;
+    }
+
+    const user = await models.users.findById(userId);
+    if (!user) {
+      res.status(HttpStatusCode.NotFound).send({ message: "User not found." });
+      return;
+    }
+
+    const matches = await bcrypt.compare(currentPassword, user.password);
+    if (!matches) {
+      res.status(HttpStatusCode.Unauthorized).send({ message: "Invalid credentials." });
+      return;
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(HttpStatusCode.Ok).send({ message: "Password updated successfully." });
+    return;
+  } catch (error) {
+    console.error("Error changing password", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
