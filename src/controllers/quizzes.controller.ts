@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { HttpStatusCode } from "axios";
 import { Types } from "mongoose";
 import { models } from "../models";
-import type { IQuiz, QuizQuestion } from "../types/quiz";
+import type { IQuiz, QuizQuestion, IQuizSubmission } from "../types/quiz";
 
 type PublicQuizQuestion = Pick<QuizQuestion, "prompt" | "options">;
 type PublicQuiz = Omit<IQuiz, "questions"> & { questions: PublicQuizQuestion[] };
@@ -107,6 +107,28 @@ export async function getQuizByIdController(
       createdAt: quiz.createdAt,
       updatedAt: quiz.updatedAt,
     };
+
+    const { userId } = (req.query || {}) as { userId?: string };
+    if (userId && Types.ObjectId.isValid(userId)) {
+      const userObjId = new Types.ObjectId(userId);
+      const quizObjId = new Types.ObjectId(quizId);
+      const existing = await models.quizSubmissions.findOne({ userRef: userObjId, quizRef: quizObjId }).lean<IQuizSubmission | null>();
+      if (existing) {
+        if (existing.passed) {
+          res.status(HttpStatusCode.Ok).send({ message: "Quiz already approved.", passed: true, score: existing.score, quiz: publicQuiz });
+          return;
+        }
+        const now = new Date();
+        const base = (existing.updatedAt as Date | undefined) ?? (existing.createdAt as Date | undefined) ?? now;
+        const availableAt = new Date(base.getTime() + 4 * 60 * 60 * 1000);
+        if (now < availableAt) {
+          const remainingMs = availableAt.getTime() - now.getTime();
+          res.status(HttpStatusCode.Ok).send({ message: "Retry not allowed yet.", retryAfterMs: remainingMs, retryAvailableAt: availableAt.toISOString(), quiz: publicQuiz });
+          return;
+        }
+      }
+    }
+
     res.status(HttpStatusCode.Ok).send({ message: "Quiz retrieved successfully.", quiz: publicQuiz });
     return;
   } catch (error) {
@@ -169,6 +191,29 @@ export async function submitQuiz(
       return;
     }
 
+    if (answers.length !== quiz.questions.length) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. answers length must match questions length." });
+      return;
+    }
+
+    const userObjId = new Types.ObjectId(userId);
+    const quizObjId = new Types.ObjectId(quizId);
+    const existing = await models.quizSubmissions.findOne({ userRef: userObjId, quizRef: quizObjId }).lean<IQuizSubmission | null>();
+    if (existing) {
+      if (existing.passed) {
+        res.status(HttpStatusCode.Conflict).send({ message: "Quiz already approved.", score: existing.score, passed: true });
+        return;
+      }
+      const now = new Date();
+      const base = existing.updatedAt ?? existing.createdAt ?? now;
+      const availableAt = new Date(base.getTime() + 4 * 60 * 60 * 1000);
+      if (now < availableAt) {
+        const remainingMs = availableAt.getTime() - now.getTime();
+        res.status(HttpStatusCode.TooManyRequests).send({ message: "Retry not allowed yet.", retryAfterMs: remainingMs, retryAvailableAt: availableAt.toISOString() });
+        return;
+      }
+    }
+
     let score = 0;
     for (let i = 0; i < quiz.questions.length; i++) {
       const a = answers[i];
@@ -178,12 +223,20 @@ export async function submitQuiz(
     const passed = score >= 9;
 
     const submission = await models.quizSubmissions.findOneAndUpdate(
-      { userRef: new Types.ObjectId(userId), quizRef: new Types.ObjectId(quizId) },
+      { userRef: userObjId, quizRef: quizObjId },
       { answers, score, passed },
       { upsert: true, new: true },
-    ).lean();
+    ).lean<IQuizSubmission | null>();
 
-    res.status(HttpStatusCode.Ok).send({ message: passed ? "Quiz approved." : "Quiz not approved.", score, passed, submission });
+    if (!passed) {
+      const base = (submission?.updatedAt as Date | undefined) ?? (submission?.createdAt as Date | undefined) ?? new Date();
+      const availableAt = new Date(base.getTime() + 4 * 60 * 60 * 1000);
+      const remainingMs = availableAt.getTime() - Date.now();
+      res.status(HttpStatusCode.Ok).send({ message: "Quiz not approved.", score, passed, retryAfterMs: Math.max(remainingMs, 0), retryAvailableAt: availableAt.toISOString(), submission });
+      return;
+    }
+
+    res.status(HttpStatusCode.Ok).send({ message: "Quiz approved.", score, passed, submission });
     return;
   } catch (error) {
     console.error("Error submitting quiz", error);
