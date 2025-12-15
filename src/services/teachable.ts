@@ -1,4 +1,18 @@
-import type { CreateUserBodyParam, ShowUserMetadataParam, EnrollUserBodyParam, ShowCourseMetadataParam, ShowCourseEnrollmentsMetadataParam, ShowLectureMetadataParam, MarkLectureCompleteBodyParam, MarkLectureCompleteMetadataParam, CourseProgressMetadataParam, ListQuizzesMetadataParam, ShowQuizMetadataParam, ShowQuizResponsesMetadataParam, ShowVideoMetadataParam, ListCoursesMetadataParam } from "@api/teachable";
+import type { CreateUserBodyParam, 
+  ShowUserMetadataParam, 
+  EnrollUserBodyParam,
+  ShowCourseMetadataParam,
+  ShowCourseEnrollmentsMetadataParam,
+  ShowLectureMetadataParam,
+  MarkLectureCompleteBodyParam,
+  MarkLectureCompleteMetadataParam,
+  CourseProgressMetadataParam,
+  ListQuizzesMetadataParam, 
+  ShowQuizMetadataParam,
+  ShowQuizResponsesMetadataParam,
+  ShowVideoMetadataParam,
+  ListCoursesMetadataParam 
+} from "@api/teachable";
 type FetchResponse<TStatus = any, TData = any> = { status: TStatus; data: TData };
 
 type TeachableSDK = {
