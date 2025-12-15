@@ -267,7 +267,30 @@ export async function getCourseById(
 
     const service = new TeachableCoursesService();
     const { data } = await service.showCourse({ course_id: courseIdNum } as any);
-    res.status(HttpStatusCode.Ok).send({ message: "Course retrieved successfully.", course: data });
+    const raw: any = data as any;
+    const courseObj: any = raw?.course ?? raw;
+    const sections: any[] = Array.isArray(courseObj?.lecture_sections) ? [...courseObj.lecture_sections] : [];
+    sections.sort((a: any, b: any) => {
+      const pa = Number(a?.position);
+      const pb = Number(b?.position);
+      const va = Number.isFinite(pa) ? pa : Number.MAX_SAFE_INTEGER;
+      const vb = Number.isFinite(pb) ? pb : Number.MAX_SAFE_INTEGER;
+      return va - vb;
+    });
+    for (const s of sections) {
+      if (Array.isArray(s?.lectures)) {
+        s.lectures = [...s.lectures].sort((la: any, lb: any) => {
+          const pa = Number(la?.position);
+          const pb = Number(lb?.position);
+          const va = Number.isFinite(pa) ? pa : Number.MAX_SAFE_INTEGER;
+          const vb = Number.isFinite(pb) ? pb : Number.MAX_SAFE_INTEGER;
+          return va - vb;
+        });
+      }
+    }
+    const orderedCourse = { ...courseObj, lecture_sections: sections };
+    const finalData = raw?.course ? { ...raw, course: orderedCourse } : orderedCourse;
+    res.status(HttpStatusCode.Ok).send({ message: "Course retrieved successfully.", course: finalData });
     return;
   } catch (error: any) {
     console.error("Error fetching course", error);
