@@ -55,6 +55,11 @@ export async function createUser(
       name: user.name,
       email: user.email,
       teachableUserId: user.teachableUserId,
+      gender: (user as any).gender,
+      genderOther: (user as any).genderOther,
+      dateOfBirth: (user as any).dateOfBirth,
+      heardAboutUs: (user as any).heardAboutUs,
+      heardAboutUsOther: (user as any).heardAboutUsOther,
       courses: user.courses,
       careers: user.careers,
       payments: user.payments,
@@ -95,6 +100,11 @@ export async function getUserById(
       name: user.name,
       email: user.email,
       teachableUserId: user.teachableUserId,
+      gender: (user as any).gender,
+      genderOther: (user as any).genderOther,
+      dateOfBirth: (user as any).dateOfBirth,
+      heardAboutUs: (user as any).heardAboutUs,
+      heardAboutUsOther: (user as any).heardAboutUsOther,
       points: user.points,
       courses: user.courses,
       careers: user.careers,
@@ -192,6 +202,11 @@ export async function loginUser(
       name: user.name,
       email: user.email,
       teachableUserId: user.teachableUserId,
+      gender: (user as any).gender,
+      genderOther: (user as any).genderOther,
+      dateOfBirth: (user as any).dateOfBirth,
+      heardAboutUs: (user as any).heardAboutUs,
+      heardAboutUsOther: (user as any).heardAboutUsOther,
       courses: user.courses,
       careers: user.careers,
       payments: user.payments,
@@ -300,9 +315,21 @@ export async function registerFromPayment(
     courseIds = Array.from(new Set(prioritized)).slice(0, 3);
 
     for (const cid of courseIds) {
-      await teachableService.enrollUser({ user_id: teachableUserId, course_id: cid } as any);
+      let enrolledRemotely = false;
+      try {
+        await teachableService.enrollUser({ user_id: teachableUserId, course_id: cid } as any);
+        enrolledRemotely = true;
+      } catch (err: any) {
+        const status = Number((err as any)?.status || (err as any)?.response?.status);
+        const msg = String((err as any)?.data?.message || (err as any)?.message || "").toLowerCase();
+        if (status === 422 || msg.includes("already enrolled")) {
+          enrolledRemotely = true;
+        } else {
+          console.error("Teachable enroll error", { courseId: cid, error: err });
+        }
+      }
       const exists = (user.courses || []).some((c: any) => Number(c.teachableCourseId) === Number(cid));
-      if (!exists) {
+      if (enrolledRemotely && !exists) {
         user.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
       }
     }
@@ -317,6 +344,11 @@ export async function registerFromPayment(
       name: user.name,
       email: user.email,
       teachableUserId: user.teachableUserId,
+      gender: (user as any).gender,
+      genderOther: (user as any).genderOther,
+      dateOfBirth: (user as any).dateOfBirth,
+      heardAboutUs: (user as any).heardAboutUs,
+      heardAboutUsOther: (user as any).heardAboutUsOther,
       courses: user.courses,
       careers: user.careers,
       payments: user.payments,
@@ -328,6 +360,120 @@ export async function registerFromPayment(
     return;
   } catch (error) {
     console.error("Error creating user from payment", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
+export async function updateUser(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req.params as Record<string, string>;
+    if (!userId || !Types.ObjectId.isValid(userId)) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid parameter. A valid userId is required." });
+      return;
+    }
+
+    const allowedGenders = ["male", "female", "prefer_not_to_say", "other"] as const;
+    const allowedHeard = [
+      "social_media_ad",
+      "friend_colleague",
+      "search_engine",
+      "online_article_blog",
+      "youtube_video",
+      "podcast",
+      "event_webinar",
+      "email_campaign",
+      "teachable_marketplace",
+      "other",
+    ] as const;
+
+    const { name, email, gender, genderOther, dateOfBirth, heardAboutUs, heardAboutUsOther } = (req.body || {}) as Record<string, any>;
+
+    const user = await models.users.findById(userId);
+    if (!user) {
+      res.status(HttpStatusCode.NotFound).send({ message: "User not found." });
+      return;
+    }
+
+    if (typeof name === "string" && name.trim() !== "") {
+      user.name = name.trim();
+    }
+
+    if (typeof email === "string" && email.trim() !== "" && email.trim() !== user.email) {
+      const conflict = await models.users.findOne({ email: email.trim(), _id: { $ne: user._id } }).lean();
+      if (conflict) {
+        res.status(HttpStatusCode.Conflict).send({ message: "Email already in use." });
+        return;
+      }
+      user.email = email.trim();
+    }
+
+    if (typeof gender === "string") {
+      const g = gender.trim().toLowerCase();
+      if (!allowedGenders.includes(g as any)) {
+        res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. Gender value is not allowed." });
+        return;
+      }
+      (user as any).gender = g;
+      (user as any).genderOther = g === "other" && typeof genderOther === "string" && genderOther.trim() !== "" ? genderOther.trim() : null;
+    } else if (Object.prototype.hasOwnProperty.call((req.body || {}), "genderOther")) {
+      (user as any).genderOther = typeof genderOther === "string" && genderOther.trim() !== "" ? genderOther.trim() : null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call((req.body || {}), "dateOfBirth")) {
+      if (dateOfBirth === null || dateOfBirth === "") {
+        (user as any).dateOfBirth = null;
+      } else {
+        const d = new Date(dateOfBirth);
+        if (Number.isNaN(d.getTime())) {
+          res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. dateOfBirth must be a valid date." });
+          return;
+        }
+        (user as any).dateOfBirth = d;
+      }
+    }
+
+    if (typeof heardAboutUs === "string") {
+      const h = heardAboutUs.trim().toLowerCase();
+      if (!allowedHeard.includes(h as any)) {
+        res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. heardAboutUs value is not allowed." });
+        return;
+      }
+      (user as any).heardAboutUs = h;
+      (user as any).heardAboutUsOther = h === "other" && typeof heardAboutUsOther === "string" && heardAboutUsOther.trim() !== "" ? heardAboutUsOther.trim() : null;
+    } else if (Object.prototype.hasOwnProperty.call((req.body || {}), "heardAboutUsOther")) {
+      (user as any).heardAboutUsOther = typeof heardAboutUsOther === "string" && heardAboutUsOther.trim() !== "" ? heardAboutUsOther.trim() : null;
+    }
+
+    await user.save();
+
+    const safeUser = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      teachableUserId: user.teachableUserId,
+      gender: (user as any).gender,
+      genderOther: (user as any).genderOther,
+      dateOfBirth: (user as any).dateOfBirth,
+      heardAboutUs: (user as any).heardAboutUs,
+      heardAboutUsOther: (user as any).heardAboutUsOther,
+      points: user.points,
+      courses: user.courses,
+      careers: user.careers,
+      payments: user.payments,
+      transactions: user.transactions,
+      createdAt: (user as any).createdAt,
+      updatedAt: (user as any).updatedAt,
+    };
+
+    res.status(HttpStatusCode.Ok).send({ message: "User updated successfully.", user: safeUser });
+    return;
+  } catch (error) {
+    console.error("Error updating user", error);
     res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
     return;
   }
