@@ -40,6 +40,10 @@ export class CertificateService {
       // Background
       doc.rect(0, 0, doc.page.width, doc.page.height).fill("#f9f9f9");
 
+      // Fudmasters Green Bottom (35% from bottom)
+      const bottomHeight = doc.page.height * 0.35;
+      doc.rect(0, doc.page.height - bottomHeight, doc.page.width, bottomHeight).fill("#2abd94");
+
       // Watermarks (Relieve) - Subtle & Background
       doc.save();
       doc.fillColor("#bdc3c7");
@@ -47,22 +51,39 @@ export class CertificateService {
       doc.fontSize(80); // Slightly larger
       doc.font("Helvetica-Bold");
 
-      // Top Right Watermark
+      // Top Right Watermark Text
       doc.text("CERTIFICADO", 0, 50, {
         align: "right",
         width: doc.page.width - 50, // Padding from right
       });
 
-      // Bottom Left Watermark
+      // Bottom Left Watermark Text
       doc.text("CERTIFICADO", 50, doc.page.height - 120, {
         align: "left",
         width: doc.page.width
       });
+
+      // SEALS (Sellos) - Professional Watermark
+      const selloPath = path.join(process.cwd(), "src", "static", "sello", "sello.png");
+      if (fs.existsSync(selloPath)) {
+        const selloSize = 300;
+        doc.opacity(0.05); // Very subtle opacity for the background seals
+
+        // Sello 1: Bottom Right (Background style)
+        doc.image(selloPath, doc.page.width - selloSize + 50, doc.page.height - selloSize + 50, { 
+          width: selloSize 
+        });
+
+        // Sello 2: Top Left (Background style)
+        doc.image(selloPath, -50, -50, { 
+          width: selloSize 
+        });
+      }
       doc.restore();
       
       // Border
       doc.lineWidth(10);
-      doc.strokeColor("#2c3e50");
+      doc.strokeColor("#000000");
       doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).stroke();
 
       // Logo
@@ -77,17 +98,17 @@ export class CertificateService {
       const centerX = 0;
       const pageWidth = doc.page.width;
 
-      doc.fillColor("#2c3e50").fontSize(40).font("Helvetica-Bold").text("CERTIFICADO DE FINALIZACIÓN", centerX, 140, { align: "center", width: pageWidth });
+      doc.fillColor("#000000").fontSize(40).font("Helvetica-Bold").text("CERTIFICADO DE FINALIZACIÓN", centerX, 140, { align: "center", width: pageWidth });
       
-      doc.fillColor("#7f8c8d").fontSize(20).font("Helvetica").text("Se certifica que", centerX, 190, { align: "center", width: pageWidth });
+      doc.fillColor("#000000").fontSize(20).font("Helvetica-Bold").text("Se certifica que", centerX, 190, { align: "center", width: pageWidth });
       
-      doc.fillColor("#2c3e50").fontSize(35).font("Helvetica-Bold").text(studentName, centerX, 220, { align: "center", width: pageWidth });
+      doc.fillColor("#000000").fontSize(35).font("Helvetica-Bold").text(studentName.toUpperCase(), centerX, 220, { align: "center", width: pageWidth });
       
-      doc.fillColor("#7f8c8d").fontSize(20).font("Helvetica").text("ha completado con éxito el curso", centerX, 270, { align: "center", width: pageWidth });
+      doc.fillColor("#000000").fontSize(20).font("Helvetica-Bold").text("ha completado con éxito el curso", centerX, 270, { align: "center", width: pageWidth });
       
-      doc.fillColor("#e67e22").fontSize(30).font("Helvetica-Bold").text(courseName, centerX, 300, { align: "center", width: pageWidth });
+      doc.fillColor("#000000").fontSize(30).font("Helvetica-Bold").text(courseName, centerX, 300, { align: "center", width: pageWidth });
       
-      doc.fillColor("#7f8c8d").fontSize(15).font("Helvetica").text(`Fecha: ${date.toLocaleDateString("es-ES")}`, centerX, 350, { align: "center", width: pageWidth });
+      doc.fillColor("#000000").fontSize(15).font("Helvetica-Bold").text(`Fecha: ${date.toLocaleDateString("es-ES")}`, centerX, 350, { align: "center", width: pageWidth });
       
       // Signatures - Positioned below the date
       const signatureY = 400;
@@ -99,8 +120,8 @@ export class CertificateService {
         const luisX = (pageWidth / 4) - (signatureWidth / 2);
         doc.image(luisSignaturePath, luisX, signatureY, { width: signatureWidth });
         
-        doc.fillColor("#2c3e50").fontSize(12).font("Helvetica-Bold").text("Luis Reyes", luisX, signatureY + 60, { width: signatureWidth, align: "center" });
-        doc.fillColor("#7f8c8d").fontSize(10).font("Helvetica").text("CEO FudMasters", luisX, signatureY + 75, { width: signatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(12).font("Helvetica-Bold").text("Luis Reyes", luisX, signatureY + 60, { width: signatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("CEO FudMasters", luisX, signatureY + 75, { width: signatureWidth, align: "center" });
       }
 
       // Mauro Signature (Right)
@@ -109,13 +130,13 @@ export class CertificateService {
         const mauroX = (pageWidth * 3 / 4) - (signatureWidth / 2);
         doc.image(mauroSignaturePath, mauroX, signatureY, { width: signatureWidth });
         
-        doc.fillColor("#2c3e50").fontSize(12).font("Helvetica-Bold").text("Mauro Reyes", mauroX, signatureY + 60, { width: signatureWidth, align: "center" });
-        doc.fillColor("#7f8c8d").fontSize(10).font("Helvetica").text("COO FudMasters", mauroX, signatureY + 75, { width: signatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(12).font("Helvetica-Bold").text("Mauro Reyes", mauroX, signatureY + 60, { width: signatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("COO FudMasters", mauroX, signatureY + 75, { width: signatureWidth, align: "center" });
       }
 
 
       // Verification Code
-      doc.fontSize(10).font("Helvetica").text(`Verification Code: ${certificateId}`, centerX, 550, { align: "center", width: pageWidth });
+      doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text(`Verification Code: ${certificateId}`, centerX, 550, { align: "center", width: pageWidth });
 
       doc.end();
     });
