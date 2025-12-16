@@ -1,29 +1,7 @@
 import { models } from "../models";
 import { TeachableCoursesService, TeachableUsersService } from "../services/teachable";
-import { certificateService } from "../services/certificate.service";
 
 let running = false;
-let cleaning = false;
-
-async function cleanExpiredCertificates(): Promise<void> {
-  if (cleaning) return;
-  cleaning = true;
-  try {
-    const now = new Date();
-    const expired = await models.certificates.find({ expiresAt: { $lt: now } });
-    if (expired.length > 0) {
-        console.log(`Cleaning up ${expired.length} expired certificates.`);
-        for (const cert of expired) {
-             certificateService.deleteCertificateFile(cert.filePath);
-             await models.certificates.deleteOne({ _id: cert._id });
-        }
-    }
-  } catch (error) {
-    console.error("Error cleaning expired certificates", error);
-  } finally {
-    cleaning = false;
-  }
-}
 
 async function fetchAllCourseIds(): Promise<number[]> {
   const coursesService = new TeachableCoursesService();
@@ -105,11 +83,6 @@ async function enrollMissingCoursesForAllUsers(): Promise<void> {
 }
 
 export const initializeSchedulers = () => {
-  // Certificate cleanup (runs every hour)
-  setInterval(() => {
-    cleanExpiredCertificates().catch(() => {});
-  }, 1000 * 60 * 60);
-
   const enabled = String(process.env.ENABLE_AUTO_ENROLL_SCHEDULER || "")
     .trim()
     .toLowerCase() === "true";
