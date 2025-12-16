@@ -129,9 +129,10 @@ export class CertificateService {
       if (fs.existsSync(mauroSignaturePath)) {
         const mauroSignatureWidth = 180; // Increased size
         const mauroX = (pageWidth * 3 / 4) - (mauroSignatureWidth / 2);
-        doc.image(mauroSignaturePath, mauroX, signatureY - 15, { width: mauroSignatureWidth });
+        // Adjusted Y to be level with Luis (removed -15 offset)
+        doc.image(mauroSignaturePath, mauroX, signatureY, { width: mauroSignatureWidth });
         
-        doc.fillColor("#000000").fontSize(12).font("Helvetica-Bold").text("Mauro Reyes", mauroX, signatureY + 60, { width: mauroSignatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(12).font("Helvetica-Bold").text("Mauro Salgán", mauroX, signatureY + 60, { width: mauroSignatureWidth, align: "center" });
         doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("COO FudMasters", mauroX, signatureY + 75, { width: mauroSignatureWidth, align: "center" });
       }
 
