@@ -97,6 +97,75 @@ export async function createUser(
   }
 }
 
+export async function getUsers(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { page = 1, limit = 10, search } = req.query as { page?: string; limit?: string; search?: string };
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, Number(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const query: any = {};
+    if (search) {
+      const searchRegex = { $regex: search, $options: "i" };
+      query.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      models.users
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean<IUser[]>(),
+      models.users.countDocuments(query),
+    ]);
+
+    const usersWithStats = users.map((user) => {
+      const approvedCourses = user.courses.filter((c) => c.completedAt).length;
+      const approvedCareers = user.careers.filter((c) => c.completedAt).length;
+
+      return {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        teachableUserId: user.teachableUserId,
+        points: user.points,
+        gender: user.gender,
+        dateOfBirth: user.dateOfBirth,
+        courses: user.courses,
+        careers: user.careers,
+        approvedCoursesCount: approvedCourses,
+        approvedCareersCount: approvedCareers,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
+    });
+
+    res.status(HttpStatusCode.Ok).send({
+      message: "Users retrieved successfully.",
+      data: usersWithStats,
+      meta: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+    return;
+  } catch (error) {
+    console.error("Error fetching users", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
 export async function getUserById(
   req: Request,
   res: Response,
