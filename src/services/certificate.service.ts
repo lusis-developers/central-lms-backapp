@@ -113,8 +113,6 @@ export class CertificateService {
         doc.fillColor("#7f8c8d").fontSize(10).font("Helvetica").text("COO FudMasters", mauroX, signatureY + 75, { width: signatureWidth, align: "center" });
       }
 
-      // Footer
-      doc.fillColor("#95a5a6").fontSize(12).text("FudMasters Institute", centerX, 530, { align: "center", width: pageWidth });
 
       // Verification Code
       doc.fontSize(10).font("Helvetica").text(`Verification Code: ${certificateId}`, centerX, 550, { align: "center", width: pageWidth });
