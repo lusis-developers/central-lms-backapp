@@ -24,7 +24,11 @@ export class CertificateService {
     }
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ layout: "landscape", size: "A4", margin: 0 });
+      const doc = new PDFDocument({ 
+        layout: "landscape", 
+        size: "A4", 
+        margin: 0
+      });
       const fileName = `certificate-${certificateId}.pdf`;
       const filePath = path.join(this.tempDir, fileName);
 
@@ -33,6 +37,26 @@ export class CertificateService {
 
       // Background
       doc.rect(0, 0, doc.page.width, doc.page.height).fill("#f9f9f9");
+
+      // Watermarks (Relieve) - Subtle & Background
+      doc.save();
+      doc.fillColor("#bdc3c7");
+      doc.opacity(0.05); // Even more subtle (5%)
+      doc.fontSize(80); // Slightly larger
+      doc.font("Helvetica-Bold");
+
+      // Top Right Watermark
+      doc.text("CERTIFICADO", 0, 50, {
+        align: "right",
+        width: doc.page.width - 50, // Padding from right
+      });
+
+      // Bottom Left Watermark
+      doc.text("CERTIFICADO", 50, doc.page.height - 120, {
+        align: "left",
+        width: doc.page.width
+      });
+      doc.restore();
       
       // Border
       doc.lineWidth(10);
