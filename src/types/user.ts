@@ -5,6 +5,7 @@ export interface CourseAccess {
   status: "active" | "revoked";
   enrolledAt: Date;
   expiresAt?: Date | null;
+  completedAt?: Date | null;
   courseRef?: Types.ObjectId | null;
 }
 
@@ -14,6 +15,7 @@ export interface CareerAccess {
   courseIds: number[];
   status: "active" | "revoked";
   enrolledAt: Date;
+  completedAt?: Date | null;
   careerRef?: Types.ObjectId | null;
 }
 

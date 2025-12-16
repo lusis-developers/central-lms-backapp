@@ -17,6 +17,7 @@ import {
   getNextVideo,
 } from "../controllers/courses.controller";
 import { createQuiz, getQuizzesByCourse, getQuizByIdController, deleteQuiz, submitQuiz } from "../controllers/quizzes.controller";
+import certificatesRouter from "./certificates.router";
 
 const coursesRouter = Router();
 
@@ -27,6 +28,9 @@ coursesRouter.post("/enroll-all-users", enrollAllUsersToAllCourses);
 coursesRouter.get("/:courseId/enrollments", getCourseEnrollments);
 coursesRouter.post("/:courseId/quizzes", createQuiz);
 coursesRouter.delete("/:courseId/quizzes/:quizId", deleteQuiz);
+
+// Certificate routes
+coursesRouter.use("/", certificatesRouter);
 
 // USER endpoints
 // Discover courses, enroll, consume content, and take quizzes
@@ -52,5 +56,8 @@ coursesRouter.get("/:courseId/quizzes", getQuizzesByCourse);
 coursesRouter.get("/:courseId/quizzes/:quizId", getQuizByIdController);
 // Submit answers to a quiz for evaluation
 coursesRouter.post("/:courseId/quizzes/:quizId/submit", submitQuiz);
+
+// Certificate routes
+coursesRouter.use("/", certificatesRouter);
 
 export default coursesRouter;
