@@ -127,11 +127,12 @@ export class CertificateService {
       // Mauro Signature (Right)
       const mauroSignaturePath = path.join(process.cwd(), "src", "static", "signatures", "mauro", "mauro-signature.png");
       if (fs.existsSync(mauroSignaturePath)) {
-        const mauroX = (pageWidth * 3 / 4) - (signatureWidth / 2);
-        doc.image(mauroSignaturePath, mauroX, signatureY, { width: signatureWidth });
+        const mauroSignatureWidth = 180; // Increased size
+        const mauroX = (pageWidth * 3 / 4) - (mauroSignatureWidth / 2);
+        doc.image(mauroSignaturePath, mauroX, signatureY - 15, { width: mauroSignatureWidth });
         
-        doc.fillColor("#000000").fontSize(12).font("Helvetica-Bold").text("Mauro Reyes", mauroX, signatureY + 60, { width: signatureWidth, align: "center" });
-        doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("COO FudMasters", mauroX, signatureY + 75, { width: signatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(12).font("Helvetica-Bold").text("Mauro Reyes", mauroX, signatureY + 60, { width: mauroSignatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("COO FudMasters", mauroX, signatureY + 75, { width: mauroSignatureWidth, align: "center" });
       }
 
 
