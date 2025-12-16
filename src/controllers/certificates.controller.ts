@@ -232,3 +232,47 @@ async function createAndSendCertificate(user: any, quiz: IQuiz, submission: IQui
     });
 }
 
+/**
+ * Verifies if a certificate is valid based on its ID.
+ * Returns certificate details including user and course info.
+ */
+export async function verifyCertificateController(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { certificateId } = req.params as { certificateId: string };
+
+    if (!certificateId || !Types.ObjectId.isValid(certificateId)) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid certificate ID." });
+      return;
+    }
+
+    const certificate = await models.certificates.findById(certificateId)
+      .populate("userRef", "name email")
+      .populate("quizRef", "teachableCourseId") // We might want more quiz info if available
+      .lean();
+
+    if (!certificate) {
+      res.status(HttpStatusCode.NotFound).send({ message: "Certificate not found or invalid." });
+      return;
+    }
+
+    // Optionally fetch course name again if needed, or rely on what we have.
+    // Since we don't store course name in certificate model (only quizRef), 
+    // we can return what we have. The frontend can fetch course details if needed 
+    // using teachableCourseId from quizRef.
+
+    res.status(HttpStatusCode.Ok).send({
+      message: "Certificate is valid.",
+      certificate
+    });
+    return;
+  } catch (error) {
+    console.error("Error verifying certificate", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
