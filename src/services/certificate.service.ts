@@ -121,7 +121,7 @@ export class CertificateService {
         doc.image(luisSignaturePath, luisX, signatureY, { width: signatureWidth });
         
         doc.fillColor("#000000").fontSize(12).font("Helvetica-Bold").text("Luis Reyes", luisX, signatureY + 60, { width: signatureWidth, align: "center" });
-        doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("CEO FudMasters", luisX, signatureY + 75, { width: signatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("CEO FudMaster", luisX, signatureY + 75, { width: signatureWidth, align: "center" });
       }
 
       // Mauro Signature (Right)
@@ -133,7 +133,7 @@ export class CertificateService {
         doc.image(mauroSignaturePath, mauroX, signatureY, { width: mauroSignatureWidth });
         
         doc.fillColor("#000000").fontSize(12).font("Helvetica-Bold").text("Mauro Salgán", mauroX, signatureY + 60, { width: mauroSignatureWidth, align: "center" });
-        doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("COO FudMasters", mauroX, signatureY + 75, { width: mauroSignatureWidth, align: "center" });
+        doc.fillColor("#000000").fontSize(10).font("Helvetica-Bold").text("COO FudMaster", mauroX, signatureY + 75, { width: mauroSignatureWidth, align: "center" });
       }
 
 
