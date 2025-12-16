@@ -24,7 +24,7 @@ export class CertificateService {
     }
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ layout: "landscape", size: "A4" });
+      const doc = new PDFDocument({ layout: "landscape", size: "A4", margin: 0 });
       const fileName = `certificate-${certificateId}.pdf`;
       const filePath = path.join(this.tempDir, fileName);
 
@@ -89,29 +89,6 @@ export class CertificateService {
 
       // Footer
       doc.fillColor("#95a5a6").fontSize(12).text("FudMasters Institute", centerX, 530, { align: "center", width: pageWidth });
-
-      // Professional Seal
-      doc.save();
-      const sealX = doc.page.width - 100;
-      const sealY = doc.page.height - 100;
-      
-      // Outer jagged circle (simplified as a thick stroke circle for now)
-      doc.lineWidth(2);
-      doc.strokeColor("#d35400"); // Darker orange
-      doc.fillColor("#f1c40f"); // Gold
-      doc.circle(sealX, sealY, 45).fillAndStroke();
-      
-      // Inner ring
-      doc.strokeColor("#e67e22");
-      doc.circle(sealX, sealY, 38).stroke();
-      
-      // Text inside seal
-      doc.fillColor("#d35400");
-      doc.fontSize(10).font("Helvetica-Bold");
-      doc.text("OFICIAL", sealX - 20, sealY - 12);
-      doc.text("CERTIFICADO", sealX - 32, sealY + 2);
-      
-      doc.restore();
 
       doc.end();
 
