@@ -1,15 +1,13 @@
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
+import { CloudinaryService } from "./cloudinary.service";
 
 export class CertificateService {
-  private tempDir: string;
+  private cloudinaryService: CloudinaryService;
 
   constructor() {
-    this.tempDir = path.join(process.cwd(), "temp", "certificates");
-    if (!fs.existsSync(this.tempDir)) {
-      fs.mkdirSync(this.tempDir, { recursive: true });
-    }
+    this.cloudinaryService = new CloudinaryService();
   }
 
   async generateCertificate(
@@ -18,22 +16,26 @@ export class CertificateService {
     date: Date,
     certificateId: string
   ): Promise<string> {
-    // Ensure directory exists before generating
-    if (!fs.existsSync(this.tempDir)) {
-      fs.mkdirSync(this.tempDir, { recursive: true });
-    }
-
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ 
         layout: "landscape", 
         size: "A4", 
         margin: 0
       });
-      const fileName = `certificate-${certificateId}.pdf`;
-      const filePath = path.join(this.tempDir, fileName);
 
-      const stream = fs.createWriteStream(filePath);
-      doc.pipe(stream);
+      const buffers: Buffer[] = [];
+      doc.on("data", buffers.push.bind(buffers));
+      doc.on("end", async () => {
+        const pdfBuffer = Buffer.concat(buffers);
+        try {
+          // Upload to Cloudinary using uploadImage (handles PDFs with resource_type: "auto")
+          // We explicitly pass "jpg" format to ensure the URL ends in .jpg and renders immediately in browser
+          const result = await this.cloudinaryService.uploadImage(pdfBuffer, "certificates", "jpg");
+          resolve(result.secure_url);
+        } catch (error) {
+          reject(error);
+        }
+      });
 
       // Background
       doc.rect(0, 0, doc.page.width, doc.page.height).fill("#f9f9f9");
@@ -115,21 +117,7 @@ export class CertificateService {
       doc.fillColor("#95a5a6").fontSize(12).text("FudMasters Institute", centerX, 530, { align: "center", width: pageWidth });
 
       doc.end();
-
-      stream.on("finish", () => {
-        resolve(filePath);
-      });
-
-      stream.on("error", (err) => {
-        reject(err);
-      });
     });
-  }
-
-  deleteCertificateFile(filePath: string): void {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
   }
 }
 
