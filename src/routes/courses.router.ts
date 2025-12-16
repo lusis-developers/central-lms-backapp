@@ -17,6 +17,7 @@ import {
   getNextVideo,
 } from "../controllers/courses.controller";
 import { createQuiz, getQuizzesByCourse, getQuizByIdController, deleteQuiz, submitQuiz } from "../controllers/quizzes.controller";
+import { generateCertificateController, downloadCertificateController, generateCertificateByCourseController, downloadCertificateByCourseController } from "../controllers/certificates.controller";
 
 const coursesRouter = Router();
 
@@ -52,5 +53,14 @@ coursesRouter.get("/:courseId/quizzes", getQuizzesByCourse);
 coursesRouter.get("/:courseId/quizzes/:quizId", getQuizByIdController);
 // Submit answers to a quiz for evaluation
 coursesRouter.post("/:courseId/quizzes/:quizId/submit", submitQuiz);
+
+// Generate Certificate
+coursesRouter.post("/:courseId/quizzes/:quizId/certificate", generateCertificateController);
+// Generate Certificate by Course (auto-detect quiz)
+coursesRouter.post("/:courseId/certificate", generateCertificateByCourseController);
+// Download Certificate
+coursesRouter.get("/:courseId/quizzes/:quizId/certificate", downloadCertificateController);
+// Download Certificate by Course
+coursesRouter.get("/:courseId/certificate", downloadCertificateByCourseController);
 
 export default coursesRouter;
