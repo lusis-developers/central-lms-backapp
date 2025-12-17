@@ -318,8 +318,9 @@ export async function loginUser(
   }
 }
 
-function randomPassword(length = 12): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@$!%*?&";
+function randomPassword(length = 32): string {
+  // Use URL-safe characters to avoid issues with query params
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let out = "";
   for (let i = 0; i < length; i++) out += chars[Math.floor(Math.random() * chars.length)];
   return out;
@@ -374,10 +375,10 @@ export async function registerFromPayment(
       if (parts.length >= 3) name = parts[parts.length - 2];
     }
 
-  const password = randomPassword(12);
-  const user = await models.users.create({ name, email, password });
+    const password = randomPassword(12);
+    const user = await models.users.create({ name, email, password });
 
-  if (transactionId || amount || currency) {
+    if (transactionId || amount || currency) {
       user.payments.push({
         provider: "other",
         amount: Number(amount || 0),
@@ -387,66 +388,66 @@ export async function registerFromPayment(
         createdAt: new Date(),
       });
       await user.save();
-  }
-
-  const teachableService = new TeachableUsersService();
-  const createBody: CreateUserBodyParam = { name, email, password };
-  const teachableRes = await teachableService.createUser(createBody);
-  const teachableUserId = extractTeachableUserId(teachableRes);
-
-  if (typeof teachableUserId === "number") {
-    user.teachableUserId = teachableUserId;
-    await user.save();
-
-    const bodyCourseIds = Array.isArray(payload.courseIds) ? payload.courseIds : undefined;
-    const envCourseIdsRaw = process.env.TEACHABLE_DEFAULT_COURSE_IDS;
-    const envSingle = process.env.TEACHABLE_DEFAULT_COURSE_ID;
-
-    let courseIds: number[] = [];
-    if (bodyCourseIds) {
-      courseIds = bodyCourseIds
-        .map((v) => Number(v))
-        .filter((n: number) => Number.isFinite(n) && n > 0);
-    } else if (envCourseIdsRaw && envCourseIdsRaw.trim() !== "") {
-      courseIds = envCourseIdsRaw
-        .split(",")
-        .map(s => Number(s.trim()))
-        .filter((n: number) => Number.isFinite(n) && n > 0);
-    } else if (envSingle && String(envSingle).trim() !== "") {
-      const single = Number(envSingle);
-      if (Number.isFinite(single) && single > 0) courseIds = [single];
     }
 
-    const mandatoryCourseId = 2916425;
-    const prioritized = [mandatoryCourseId, ...courseIds.filter((id) => id !== mandatoryCourseId)];
-    courseIds = Array.from(new Set(prioritized)).slice(0, 3);
+    const teachableService = new TeachableUsersService();
+    const createBody: CreateUserBodyParam = { name, email, password };
+    const teachableRes = await teachableService.createUser(createBody);
+    const teachableUserId = extractTeachableUserId(teachableRes);
 
-    for (const cid of courseIds) {
-      let enrolledRemotely = false;
-      try {
-        const body: EnrollUserBodyParam = { user_id: teachableUserId, course_id: cid };
-        await teachableService.enrollUser(body);
-        enrolledRemotely = true;
-      } catch (err) {
-        const status = (err as { status?: number }).status ?? (err as { response?: { status?: number } }).response?.status;
-        const rawMsg = (err as { data?: { message?: string }; message?: string }).data?.message ?? (err as { message?: string }).message ?? "";
-        const msg = typeof rawMsg === "string" ? rawMsg.toLowerCase() : "";
-        if (status === 422 || msg.includes("already enrolled")) {
+    if (typeof teachableUserId === "number") {
+      user.teachableUserId = teachableUserId;
+      await user.save();
+
+      const bodyCourseIds = Array.isArray(payload.courseIds) ? payload.courseIds : undefined;
+      const envCourseIdsRaw = process.env.TEACHABLE_DEFAULT_COURSE_IDS;
+      const envSingle = process.env.TEACHABLE_DEFAULT_COURSE_ID;
+
+      let courseIds: number[] = [];
+      if (bodyCourseIds) {
+        courseIds = bodyCourseIds
+          .map((v) => Number(v))
+          .filter((n: number) => Number.isFinite(n) && n > 0);
+      } else if (envCourseIdsRaw && envCourseIdsRaw.trim() !== "") {
+        courseIds = envCourseIdsRaw
+          .split(",")
+          .map(s => Number(s.trim()))
+          .filter((n: number) => Number.isFinite(n) && n > 0);
+      } else if (envSingle && String(envSingle).trim() !== "") {
+        const single = Number(envSingle);
+        if (Number.isFinite(single) && single > 0) courseIds = [single];
+      }
+
+      const mandatoryCourseId = 2916425;
+      const prioritized = [mandatoryCourseId, ...courseIds.filter((id) => id !== mandatoryCourseId)];
+      courseIds = Array.from(new Set(prioritized)).slice(0, 3);
+
+      for (const cid of courseIds) {
+        let enrolledRemotely = false;
+        try {
+          const body: EnrollUserBodyParam = { user_id: teachableUserId, course_id: cid };
+          await teachableService.enrollUser(body);
           enrolledRemotely = true;
-        } else {
-          console.error("Teachable enroll error", { courseId: cid, error: err });
+        } catch (err) {
+          const status = (err as { status?: number }).status ?? (err as { response?: { status?: number } }).response?.status;
+          const rawMsg = (err as { data?: { message?: string }; message?: string }).data?.message ?? (err as { message?: string }).message ?? "";
+          const msg = typeof rawMsg === "string" ? rawMsg.toLowerCase() : "";
+          if (status === 422 || msg.includes("already enrolled")) {
+            enrolledRemotely = true;
+          } else {
+            console.error("Teachable enroll error", { courseId: cid, error: err });
+          }
+        }
+        const exists = (user.courses || []).some((c: CourseAccess) => Number(c.teachableCourseId) === Number(cid));
+        if (enrolledRemotely && !exists) {
+          user.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
         }
       }
-      const exists = (user.courses || []).some((c: CourseAccess) => Number(c.teachableCourseId) === Number(cid));
-      if (enrolledRemotely && !exists) {
-        user.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
-      }
+      await user.save();
     }
-    await user.save();
-  }
 
-  const emailService = new EmailService();
-  await emailService.sendTemporaryPassword(email, name, password);
+    const emailService = new EmailService();
+    await emailService.sendTemporaryPassword(email, name, password);
 
     const safeUser = {
       _id: user._id,
@@ -591,6 +592,277 @@ export async function updateUser(
     return;
   } catch (error) {
     console.error("Error updating user", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
+export async function grantManualAccess(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { name, email, courseIds: requestedCourseIds } = (req.body || {}) as {
+      name?: string;
+      email?: string;
+      courseIds?: Array<number | string>;
+    };
+
+    if (!name || !email) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. Name and email are required." });
+      return;
+    }
+
+    let user = await models.users.findOne({ email }).lean<IUser>();
+    let password = "";
+    let isNewUser = false;
+
+    if (!user) {
+      isNewUser = true;
+      password = randomPassword(12);
+      // Create user
+      const newUser = await models.users.create({ name, email, password });
+      user = newUser.toObject();
+    }
+
+    // Always ensure we have a teachable user
+    const teachableService = new TeachableUsersService();
+    if (!user!.teachableUserId) {
+      // Create in Teachable if missing
+      // If user existed but no teachableId, we need a password for teachable creation?
+      // Teachable API requires password. If existing user, we don't have their password.
+      // We might generate a temp one if we strictly need to create it.
+      // But for now, let's assume if it's new user we have password.
+      const pwdToUse = password || randomPassword(12);
+      const createBody: CreateUserBodyParam = { name, email, password: pwdToUse };
+      const teachableRes = await teachableService.createUser(createBody);
+      const teachableUserId = extractTeachableUserId(teachableRes);
+
+      if (teachableUserId) {
+        await models.users.updateOne({ _id: user!._id }, { teachableUserId });
+        user!.teachableUserId = teachableUserId;
+      }
+    }
+
+    // Enrollment Logic
+    if (user!.teachableUserId) {
+      const allCourseIds: number[] = [];
+      const mandatoryCourseId = 2916425;
+      allCourseIds.push(mandatoryCourseId);
+
+      // Add requested courses
+      if (Array.isArray(requestedCourseIds)) {
+        requestedCourseIds.forEach(cid => {
+          const n = Number(cid);
+          if (Number.isFinite(n) && n > 0) allCourseIds.push(n);
+        });
+      }
+
+      // Add env default courses
+      const envCourseIdsRaw = process.env.TEACHABLE_DEFAULT_COURSE_IDS;
+      if (envCourseIdsRaw && envCourseIdsRaw.trim() !== "") {
+        const envIds = envCourseIdsRaw
+          .split(",")
+          .map((s) => Number(s.trim()))
+          .filter((n: number) => Number.isFinite(n) && n > 0);
+        allCourseIds.push(...envIds);
+      }
+
+      const envSingle = process.env.TEACHABLE_DEFAULT_COURSE_ID;
+      if (envSingle && String(envSingle).trim() !== "") {
+        const single = Number(envSingle);
+        if (Number.isFinite(single) && single > 0) allCourseIds.push(single);
+      }
+
+      // Prioritize mandatory and unique
+      // Note: "slice(0, 3)" is in the payment flow. The user said "todos los cursos". 
+      // If we want *all* defaults + requested, maybe we shouldn't slice if it's manual access?
+      // But to be "like payment flow", I will keep the logic but maybe expand the limit if requested explicitly?
+      // Let's stick to the exact logic of registerFromPayment for consistency, but if they requested specific IDs, we ensure they are in.
+      const uniqueCourseIds = Array.from(new Set(allCourseIds));
+      // If I slice, I might cut off requested ones.
+      // I will slice ONLY if no specific ids were requested, or ensure requested are first?
+      // The payment flow prioritizes mandatory then others.
+      // Let's just enroll in ALL unique determined courses to be safe for "manual access".
+      // Remove slice for manual access to ensure "todos" really means all intended.
+
+      const coursesToEnroll = uniqueCourseIds; // No slice for manual override
+
+      // Fetch fresh user document to update
+      const userDoc = await models.users.findById(user!._id);
+      if (!userDoc) throw new Error("User not found after creation");
+
+      for (const cid of coursesToEnroll) {
+        let enrolledRemotely = false;
+        try {
+          const body: EnrollUserBodyParam = { user_id: user!.teachableUserId, course_id: cid };
+          await teachableService.enrollUser(body);
+          enrolledRemotely = true;
+        } catch (err) {
+          const status = (err as { status?: number }).status ?? (err as { response?: { status?: number } }).response?.status;
+          const rawMsg = (err as { data?: { message?: string }; message?: string }).data?.message ?? (err as { message?: string }).message ?? "";
+          const msg = typeof rawMsg === "string" ? rawMsg.toLowerCase() : "";
+          if (status === 422 || msg.includes("already enrolled")) {
+            enrolledRemotely = true;
+          } else {
+            console.error("Teachable enroll error", { courseId: cid, error: err });
+          }
+        }
+
+        const exists = (userDoc.courses || []).some((c: CourseAccess) => Number(c.teachableCourseId) === Number(cid));
+        if (enrolledRemotely && !exists) {
+          userDoc.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
+        }
+      }
+
+      // Add a "manual" transaction record for tracking
+      userDoc.payments.push({
+        provider: "other", // or 'manual' if enum allows, but enum is strict in schema? Schema says "other" is allowed.
+        amount: 0,
+        currency: "USD",
+        transactionId: `MANUAL-${Date.now()}`,
+        status: "completed",
+        createdAt: new Date(),
+      });
+
+      await userDoc.save();
+      user = userDoc.toObject();
+    }
+
+    // Send email ONLY if we generated a password (new user) OR if explicitly requested?
+    // User said: "enviarse el correo con la contraseña".
+    // If it's a new user, we have `password`.
+    if (isNewUser && password) {
+      const emailService = new EmailService();
+      await emailService.sendTemporaryPassword(email, name, password);
+    }
+
+    const safeUser = {
+      _id: user!._id,
+      name: user!.name,
+      email: user!.email,
+      teachableUserId: user!.teachableUserId,
+      courses: user!.courses,
+      careers: user!.careers,
+      payments: user!.payments,
+      createdAt: user!.createdAt,
+      updatedAt: user!.updatedAt,
+    };
+
+    res.status(HttpStatusCode.Ok).send({
+      message: "Manual access granted successfully.",
+      user: safeUser,
+      password: password || undefined // Return password in response just in case admin needs it
+    });
+    return;
+
+  } catch (error) {
+    console.error("Error granting manual access", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
+export async function requestPasswordRecovery(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { email } = (req.body || {}) as { email?: string };
+    console.log("--> requestPasswordRecovery called with email:", email);
+
+    if (!email) {
+      console.log("--> Email is missing in payload");
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. Email is required." });
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    console.log("--> Searching for user with email:", trimmedEmail);
+
+    const user = await models.users.findOne({ email: trimmedEmail });
+
+    if (!user) {
+      console.log("--> User NOT found for email:", trimmedEmail);
+      // To prevent email enumeration, we can return OK but do nothing.
+      // However, for better UX in some cases we might want to tell them.
+      // Let's assume standard security practice: return OK even if not found.
+      // Or if the client specifically asked to know, we can return 404.
+      // Given the prompt "si existe enviar un correo... y guardarlo en la base de datos",
+      // implying we proceed only if exists. Let's return OK generic message.
+      res.status(HttpStatusCode.Ok).send({ message: "If the email exists, a recovery link has been sent." });
+      return;
+    }
+
+    console.log("--> User FOUND:", user._id);
+
+    const token = randomPassword(32); // Simple random string token
+    const expires = new Date(Date.now() + 3600000); // 1 hour expiration
+
+    user.recoveryToken = token;
+    user.recoveryTokenExpires = expires;
+    await user.save();
+    console.log("--> Token generated and saved for user:", user._id);
+
+    const emailService = new EmailService();
+    // We don't wait for email to send to return response to avoid blocking if email service is slow,
+    // but here we should probably await to ensure it works, or catch error.
+    try {
+      console.log("--> Attempting to send recovery email to:", user.email);
+      await emailService.sendPasswordRecovery(user.email, user.name, token);
+      console.log("--> Recovery email sent successfully");
+    } catch (err) {
+      console.error("--> Error sending recovery email", err);
+      // If email fails, we might want to revert token? or just let it expire.
+      // Let's return 500 if email fails so user knows to retry.
+      res.status(HttpStatusCode.InternalServerError).send({ message: "Error sending email." });
+      return;
+    }
+
+    res.status(HttpStatusCode.Ok).send({ message: "If the email exists, a recovery link has been sent." });
+    return;
+  } catch (error) {
+    console.error("Error requesting password recovery", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
+export async function resetPassword(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { token, newPassword } = (req.body || {}) as { token?: string; newPassword?: string };
+
+    if (!token || !newPassword) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. Token and new password are required." });
+      return;
+    }
+
+    const user = await models.users.findOne({
+      recoveryToken: token,
+      recoveryTokenExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      console.log("--> Token is invalid or expired.");
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid or expired token." });
+      return;
+    }
+
+    user.password = newPassword;
+    user.recoveryToken = null;
+    user.recoveryTokenExpires = null;
+    await user.save();
+
+    res.status(HttpStatusCode.Ok).send({ message: "Password reset successfully." });
+    return;
+  } catch (error) {
+    console.error("Error resetting password", error);
     res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
     return;
   }
