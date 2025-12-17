@@ -72,6 +72,8 @@ const UserSchema = new Schema<IUser>(
     careers: { type: [CareerAccessSchema], default: [] },
     payments: { type: [PaymentSchema], default: [] },
     transactions: { type: [Schema.Types.ObjectId], ref: "transactions", default: [] },
+    recoveryToken: { type: String, default: null },
+    recoveryTokenExpires: { type: Date, default: null },
   },
   { timestamps: true, versionKey: false },
 );
