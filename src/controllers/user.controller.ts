@@ -387,7 +387,7 @@ export async function registerFromPayment(
         status: "completed",
         createdAt: new Date(),
       });
-      user.accountType = "premium";
+      user.accountType = "founder";
       await user.save();
     }
 
@@ -727,7 +727,12 @@ export async function grantManualAccess(
         status: "completed",
         createdAt: new Date(),
       });
-      userDoc.accountType = "premium";
+      const { accountType } = (req.body || {}) as { accountType?: string };
+      if (accountType && ["free", "premium", "student", "founder"].includes(accountType)) {
+        userDoc.accountType = accountType as IUser["accountType"];
+      } else {
+        userDoc.accountType = "founder";
+      }
 
       await userDoc.save();
       user = userDoc.toObject();
