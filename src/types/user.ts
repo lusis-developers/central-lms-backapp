@@ -58,6 +58,7 @@ export interface IUser {
   transactions?: Types.ObjectId[];
   recoveryToken?: string | null;
   recoveryTokenExpires?: Date | null;
+  accountType: "free" | "premium" | "student" | "founder";
   createdAt?: Date;
   updatedAt?: Date;
 }
