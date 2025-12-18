@@ -61,6 +61,8 @@ export interface IUser {
   careers: CareerAccess[];
   payments: Payment[];
   transactions?: Types.ObjectId[];
+  recoveryToken?: string | null;
+  recoveryTokenExpires?: Date | null;
   completedLectures: CompletedLecture[];
   createdAt?: Date;
   updatedAt?: Date;
