@@ -82,6 +82,7 @@ const UserSchema = new Schema<IUser>(
     transactions: { type: [Schema.Types.ObjectId], ref: "transactions", default: [] },
     recoveryToken: { type: String, default: null },
     recoveryTokenExpires: { type: Date, default: null },
+    accountType: { type: String, enum: ["free", "premium", "student", "founder"], default: "free" },
     completedLectures: { type: [CompletedLectureSchema], default: [] },
   },
   { timestamps: true, versionKey: false },
