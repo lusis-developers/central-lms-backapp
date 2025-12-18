@@ -97,6 +97,46 @@ export async function createUser(
   }
 }
 
+export async function deleteUser(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req.params;
+
+    if (!userId || !Types.ObjectId.isValid(userId)) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid parameter. A valid userId is required." });
+      return;
+    }
+
+    const user = await models.users.findById(userId);
+    if (!user) {
+      res.status(HttpStatusCode.NotFound).send({ message: "User not found." });
+      return;
+    }
+
+    // Delete all related data in parallel
+    await Promise.all([
+      models.transactions.deleteMany({ user: userId }),
+      models.quizSubmissions.deleteMany({ userRef: userId }),
+      models.comments.deleteMany({ user: userId }),
+      models.certificates.deleteMany({ userRef: userId }),
+      // Also remove user from likes in comments? Maybe too heavy, but let's stick to main entities.
+    ]);
+
+    // Finally delete the user
+    await models.users.findByIdAndDelete(userId);
+
+    res.status(HttpStatusCode.Ok).send({ message: "User and all related data deleted successfully." });
+    return;
+  } catch (error) {
+    console.error("Error deleting user", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
 export async function getUsers(
   req: Request,
   res: Response,
@@ -173,6 +213,7 @@ export async function getUserById(
 ): Promise<void> {
   try {
     const { userId } = req.params as { userId: string };
+    console.log('esto se corre ahora que reacrgeu')
 
     if (!userId || !Types.ObjectId.isValid(userId)) {
       res.status(HttpStatusCode.BadRequest).send({ message: "Invalid parameter. A valid userId is required." });
@@ -200,6 +241,7 @@ export async function getUserById(
       careers: user.careers,
       payments: user.payments,
       transactions: user.transactions,
+      accountType: user.accountType || "free",
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -237,12 +279,25 @@ export async function checkUserByEmail(
       return;
     }
 
+    // Check if user has a paid account type (anything other than "free")
+    // If they have a paid account (premium, student, founder), we pretend they don't exist 
+    // to allow the frontend to proceed with a purchase/registration flow without blocking.
+    
+    const accountType = user.accountType || "free";
+    
+    // If account type is NOT free, we return exists: false to allow the process to continue
+    if (accountType !== "free") {
+       res.status(HttpStatusCode.Ok).send({ message: "User not found (masked).", exists: false });
+       return;
+    }
+
     const safeUser = {
       _id: user._id,
       email: user.email,
       teachableUserId: user.teachableUserId,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      accountType
     };
 
     res.status(HttpStatusCode.Ok).send({ message: "User exists.", exists: true, user: safeUser });
@@ -326,129 +381,31 @@ function randomPassword(length = 32): string {
   return out;
 }
 
+import { PaymentService, type PaymentPayload } from "../services/payment.service";
+
 export async function registerFromPayment(
   req: Request,
   res: Response,
   _next: NextFunction,
 ): Promise<void> {
   try {
-    const payload = (req.body || {}) as {
-      email?: string;
-      transactionStatus?: string;
-      statusCode?: number;
-      authorizationCode?: string;
-      transactionId?: string | number;
-      amount?: number | string;
-      currency?: string;
-      reference?: string;
-      courseIds?: Array<number | string> | null;
-    };
-    const email: string | undefined = payload.email;
-    const transactionStatus: string | undefined = payload.transactionStatus;
-    const statusCode: number | undefined = payload.statusCode;
-    const authorizationCode: string | undefined = payload.authorizationCode;
-    const transactionId: string | number | undefined = payload.transactionId;
-    const amountVal = payload.amount;
-    const amount: number | undefined = typeof amountVal === "string" ? Number(amountVal) : amountVal;
-    const currency: string | undefined = payload.currency;
-    const reference: string | undefined = payload.reference;
+    const payload = (req.body || {}) as PaymentPayload;
+    const paymentService = new PaymentService();
 
-    if (!email || typeof email !== "string") {
-      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. Email is required." });
-      return;
-    }
-
-    if (!(transactionStatus === "Approved" || statusCode === 3)) {
-      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. Transaction must be approved." });
-      return;
-    }
-
-    const existing = await models.users.findOne({ email }).lean<IUser>();
-    if (existing) {
-      res.status(HttpStatusCode.Ok).send({ message: "User already exists.", user: existing });
-      return;
-    }
-
-    let name = "User";
-    if (typeof reference === "string") {
-      const parts = reference.split(" - ").map(s => s.trim());
-      if (parts.length >= 3) name = parts[parts.length - 2];
-    }
-
-    const password = randomPassword(12);
-    const user = await models.users.create({ name, email, password });
-
-    if (transactionId || amount || currency) {
-      user.payments.push({
-        provider: "other",
-        amount: Number(amount || 0),
-        currency: String(currency || "USD"),
-        transactionId: String(transactionId || authorizationCode || ""),
-        status: "completed",
-        createdAt: new Date(),
-      });
-      user.accountType = "founder";
-      await user.save();
-    }
-
-    const teachableService = new TeachableUsersService();
-    const createBody: CreateUserBodyParam = { name, email, password };
-    const teachableRes = await teachableService.createUser(createBody);
-    const teachableUserId = extractTeachableUserId(teachableRes);
-
-    if (typeof teachableUserId === "number") {
-      user.teachableUserId = teachableUserId;
-      await user.save();
-
-      const bodyCourseIds = Array.isArray(payload.courseIds) ? payload.courseIds : undefined;
-      const envCourseIdsRaw = process.env.TEACHABLE_DEFAULT_COURSE_IDS;
-      const envSingle = process.env.TEACHABLE_DEFAULT_COURSE_ID;
-
-      let courseIds: number[] = [];
-      if (bodyCourseIds) {
-        courseIds = bodyCourseIds
-          .map((v) => Number(v))
-          .filter((n: number) => Number.isFinite(n) && n > 0);
-      } else if (envCourseIdsRaw && envCourseIdsRaw.trim() !== "") {
-        courseIds = envCourseIdsRaw
-          .split(",")
-          .map(s => Number(s.trim()))
-          .filter((n: number) => Number.isFinite(n) && n > 0);
-      } else if (envSingle && String(envSingle).trim() !== "") {
-        const single = Number(envSingle);
-        if (Number.isFinite(single) && single > 0) courseIds = [single];
+    // Delegate logic to service
+    // Service throws Error if validation fails
+    let result;
+    try {
+      result = await paymentService.processPaymentRegistration(payload);
+    } catch (err: any) {
+      if (err.message && err.message.includes("Invalid payload")) {
+        res.status(HttpStatusCode.BadRequest).send({ message: err.message });
+        return;
       }
-
-      const mandatoryCourseId = 2916425;
-      const prioritized = [mandatoryCourseId, ...courseIds.filter((id) => id !== mandatoryCourseId)];
-      courseIds = Array.from(new Set(prioritized)).slice(0, 3);
-
-      for (const cid of courseIds) {
-        let enrolledRemotely = false;
-        try {
-          const body: EnrollUserBodyParam = { user_id: teachableUserId, course_id: cid };
-          await teachableService.enrollUser(body);
-          enrolledRemotely = true;
-        } catch (err) {
-          const status = (err as { status?: number }).status ?? (err as { response?: { status?: number } }).response?.status;
-          const rawMsg = (err as { data?: { message?: string }; message?: string }).data?.message ?? (err as { message?: string }).message ?? "";
-          const msg = typeof rawMsg === "string" ? rawMsg.toLowerCase() : "";
-          if (status === 422 || msg.includes("already enrolled")) {
-            enrolledRemotely = true;
-          } else {
-            console.error("Teachable enroll error", { courseId: cid, error: err });
-          }
-        }
-        const exists = (user.courses || []).some((c: CourseAccess) => Number(c.teachableCourseId) === Number(cid));
-        if (enrolledRemotely && !exists) {
-          user.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
-        }
-      }
-      await user.save();
+      throw err;
     }
 
-    const emailService = new EmailService();
-    await emailService.sendTemporaryPassword(email, name, password);
+    const { user, isNew } = result;
 
     const safeUser = {
       _id: user._id,
@@ -468,10 +425,14 @@ export async function registerFromPayment(
       accountType: user.accountType || "free"
     };
 
-    res.status(HttpStatusCode.Created).send({ message: "User created and email sent successfully.", user: safeUser });
+    if (isNew) {
+      res.status(HttpStatusCode.Created).send({ message: "User created and email sent successfully.", user: safeUser });
+    } else {
+      res.status(HttpStatusCode.Ok).send({ message: "User updated to founder successfully.", user: safeUser });
+    }
     return;
   } catch (error) {
-    console.error("Error creating user from payment", error);
+    console.error("Error creating/updating user from payment", error);
     res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
     return;
   }
