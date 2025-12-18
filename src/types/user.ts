@@ -30,6 +30,11 @@ export interface Payment {
   careerId?: string;
 }
 
+export interface CompletedLecture {
+  courseId: number;
+  lectureId: number;
+}
+
 export interface IUser {
   _id: Types.ObjectId;
   name: string;
@@ -59,6 +64,7 @@ export interface IUser {
   recoveryToken?: string | null;
   recoveryTokenExpires?: Date | null;
   accountType: "free" | "premium" | "student" | "founder";
+  completedLectures: CompletedLecture[];
   createdAt?: Date;
   updatedAt?: Date;
 }

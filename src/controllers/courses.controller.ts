@@ -3,6 +3,7 @@ import { HttpStatusCode } from "axios";
 import { Types } from "mongoose";
 import { models } from "../models";
 import { TeachableCoursesService, TeachableUsersService } from "../services/teachable";
+import { PointsService } from "../services/points";
 
 function parsePositiveNumber(value: any): number | undefined {
   const n = Number(value);
@@ -119,6 +120,16 @@ async function resolveTeachableUserId(userId?: string, teachableUserId?: any): P
     const user = await models.users.findById(userId).lean();
     const id = parsePositiveNumber(user?.teachableUserId);
     if (id) return id;
+  }
+  return undefined;
+}
+
+async function resolveUserId(userId?: string, teachableUserId?: any): Promise<string | undefined> {
+  if (userId && Types.ObjectId.isValid(userId)) return userId;
+  const parsedTeachable = parsePositiveNumber(teachableUserId);
+  if (parsedTeachable) {
+    const user = await models.users.findOne({ teachableUserId: parsedTeachable }).lean();
+    return user?._id?.toString();
   }
   return undefined;
 }
@@ -381,6 +392,14 @@ export async function completeLectureForUser(
 
     const service = new TeachableCoursesService();
     await service.markLectureComplete({ user_id: finalTeachableUserId } as any, { course_id: courseIdNum, lecture_id: lectureIdNum } as any);
+
+    // Award points for completing the lecture
+    const resolvedUserId = await resolveUserId(userId, teachableUserId);
+    if (resolvedUserId) {
+      const pointsService = new PointsService();
+      await pointsService.awardLecturePoint(resolvedUserId, courseIdNum, lectureIdNum);
+    }
+
     res.status(HttpStatusCode.NoContent).send({ message: "Lecture marked as complete." });
     return;
   } catch (error: any) {
