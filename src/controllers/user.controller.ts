@@ -387,6 +387,7 @@ export async function registerFromPayment(
         status: "completed",
         createdAt: new Date(),
       });
+      user.accountType = "premium";
       await user.save();
     }
 
@@ -464,6 +465,7 @@ export async function registerFromPayment(
       payments: user.payments,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      accountType: user.accountType || "free"
     };
 
     res.status(HttpStatusCode.Created).send({ message: "User created and email sent successfully.", user: safeUser });
@@ -725,6 +727,7 @@ export async function grantManualAccess(
         status: "completed",
         createdAt: new Date(),
       });
+      userDoc.accountType = "premium";
 
       await userDoc.save();
       user = userDoc.toObject();
@@ -745,9 +748,10 @@ export async function grantManualAccess(
       teachableUserId: user!.teachableUserId,
       courses: user!.courses,
       careers: user!.careers,
-      payments: user!.payments,
-      createdAt: user!.createdAt,
-      updatedAt: user!.updatedAt,
+      payments: user.payments,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      accountType: user.accountType || "free"
     };
 
     res.status(HttpStatusCode.Ok).send({
@@ -916,6 +920,100 @@ export async function changePassword(
     return;
   } catch (error) {
     console.error("Error changing password", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
+export async function loginWithGoogle(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    // Expect req.user from verifyFirebaseToken middleware
+    const firebaseUser = (req as any).user;
+
+    if (!firebaseUser) {
+       res.status(HttpStatusCode.Unauthorized).send({ message: "User not authenticated via Google." });
+       return;
+    }
+
+    const { email, name, picture } = firebaseUser;
+
+    if (!email) {
+      res.status(HttpStatusCode.BadRequest).send({ message: "Invalid token. Email not found." });
+      return;
+    }
+
+    let user = await models.users.findOne({ email });
+
+    if (!user) {
+      // Create User if not exists
+      const password = randomPassword(32);
+      user = await models.users.create({ 
+        name: name || "Google User", 
+        email, 
+        password,
+        accountType: "free"
+      });
+
+      // Teachable Logic (replicated from createUser)
+      try {
+        const teachableService = new TeachableUsersService();
+        const createBody: CreateUserBodyParam = { name: user.name, email: user.email, password };
+        const teachableRes = await teachableService.createUser(createBody);
+        const teachableUserId = extractTeachableUserId(teachableRes);
+
+        if (typeof teachableUserId === "number") {
+          user.teachableUserId = teachableUserId;
+          await user.save();
+
+          // We do NOT enroll in any course for Google Login (Free Tier)
+          // The user starts with 0 courses.
+        }
+      } catch (teachableErr) {
+        console.error("Error creating user in Teachable during Google Login", teachableErr);
+      }
+    }
+
+    // Generate JWT
+    const secret = process.env.JWT_SECRET?.trim();
+    if (!secret) {
+      console.error("Missing JWT_SECRET env var");
+      res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+      return;
+    }
+
+    const jwtToken = jwt.sign(
+      { sub: user._id.toString(), email: user.email },
+      secret,
+      { expiresIn: "7d" },
+    );
+
+    const safeUser = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      teachableUserId: user.teachableUserId,
+      gender: user.gender,
+      genderOther: user.genderOther,
+      dateOfBirth: user.dateOfBirth,
+      heardAboutUs: user.heardAboutUs,
+      heardAboutUsOther: user.heardAboutUsOther,
+      courses: user.courses,
+      careers: user.careers,
+      payments: user.payments,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      accountType: user.accountType || "free",
+      picture // pass back picture if needed by frontend
+    };
+
+    res.status(HttpStatusCode.Ok).send({ message: "Login successful.", token: jwtToken, user: safeUser });
+    return;
+  } catch (error) {
+    console.error("Error logging in with Google", error);
     res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
     return;
   }
