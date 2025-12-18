@@ -97,6 +97,30 @@ export async function createUser(
   }
 }
 
+export async function upgradeAllToFounder(
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    // Update all users who are not already founder
+    const result = await models.users.updateMany(
+      {}, 
+      { $set: { accountType: "founder" } }
+    );
+
+    res.status(HttpStatusCode.Ok).send({ 
+      message: "All users have been upgraded to founder successfully.", 
+      modifiedCount: result.modifiedCount 
+    });
+    return;
+  } catch (error) {
+    console.error("Error upgrading all users to founder", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
+    return;
+  }
+}
+
 export async function deleteUser(
   req: Request,
   res: Response,
@@ -528,6 +552,14 @@ export async function updateUser(
       user.heardAboutUsOther = h === "other" && typeof heardAboutUsOther === "string" && heardAboutUsOther.trim() !== "" ? heardAboutUsOther.trim() : null;
     } else if (Object.prototype.hasOwnProperty.call((req.body || {}), "heardAboutUsOther")) {
       user.heardAboutUsOther = typeof heardAboutUsOther === "string" && heardAboutUsOther.trim() !== "" ? heardAboutUsOther.trim() : null;
+    }
+
+    // Allow updating accountType (Admin feature ideally, but open for now as requested)
+    if (Object.prototype.hasOwnProperty.call((req.body || {}), "accountType")) {
+      const { accountType } = req.body as { accountType?: string };
+      if (accountType && ["free", "premium", "student", "founder"].includes(accountType)) {
+        user.accountType = accountType as IUser["accountType"];
+      }
     }
 
     await user.save();
