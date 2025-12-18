@@ -1,6 +1,6 @@
 import { Schema, model } from "mongoose";
 import bcrypt from "bcryptjs";
-import type { IUser, CourseAccess, CareerAccess, Payment } from "../types/user";
+import type { IUser, CourseAccess, CareerAccess, Payment, CompletedLecture } from "../types/user";
 
 const CourseAccessSchema = new Schema<CourseAccess>(
   {
@@ -41,6 +41,14 @@ const PaymentSchema = new Schema<Payment>(
   { _id: false },
 );
 
+const CompletedLectureSchema = new Schema<CompletedLecture>(
+  {
+    courseId: { type: Number, required: true },
+    lectureId: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
 const UserSchema = new Schema<IUser>(
   {
     name: { type: String, required: true },
@@ -75,6 +83,7 @@ const UserSchema = new Schema<IUser>(
     recoveryToken: { type: String, default: null },
     recoveryTokenExpires: { type: Date, default: null },
     accountType: { type: String, enum: ["free", "premium", "student", "founder"], default: "free" },
+    completedLectures: { type: [CompletedLectureSchema], default: [] },
   },
   { timestamps: true, versionKey: false },
 );
