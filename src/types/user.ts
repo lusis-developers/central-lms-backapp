@@ -30,6 +30,11 @@ export interface Payment {
   careerId?: string;
 }
 
+export interface CompletedLecture {
+  courseId: number;
+  lectureId: number;
+}
+
 export interface IUser {
   _id: Types.ObjectId;
   name: string;
@@ -56,6 +61,7 @@ export interface IUser {
   careers: CareerAccess[];
   payments: Payment[];
   transactions?: Types.ObjectId[];
+  completedLectures: CompletedLecture[];
   createdAt?: Date;
   updatedAt?: Date;
 }
