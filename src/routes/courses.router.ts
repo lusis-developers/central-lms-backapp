@@ -5,6 +5,7 @@ import {
   enrollUserToCourse,
   enrollUserToAllCourses,
   enrollAllUsersToAllCourses,
+  revokeAccessForNonFounders,
   getCourseById,
   getCourseEnrollments,
   getLectureById,
@@ -25,6 +26,7 @@ const coursesRouter = Router();
 // Create and manage enrollments at scale, and manage course quizzes
 coursesRouter.post("/enroll-all/:userId", enrollUserToAllCourses);
 coursesRouter.post("/enroll-all-users", enrollAllUsersToAllCourses);
+coursesRouter.post("/revoke-non-founders", revokeAccessForNonFounders);
 coursesRouter.get("/:courseId/enrollments", getCourseEnrollments);
 coursesRouter.post("/:courseId/quizzes", createQuiz);
 coursesRouter.delete("/:courseId/quizzes/:quizId", deleteQuiz);
