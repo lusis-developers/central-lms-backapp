@@ -88,6 +88,14 @@ export class TeachableUsersService {
   async enrollUser(body: EnrollUserBodyParam): Promise<FetchResponse<any, any>> {
     return this.sdk.enrollUser(body);
   }
+
+  /**
+   * Unenroll a user from a course using user_id and course_id.
+   * Returns 204 on success, 404/422 on errors.
+   */
+  async unenrollUser(body: { user_id: number; course_id: number }): Promise<FetchResponse<any, any>> {
+    return this.sdk.unenrollUser(body);
+  }
 }
 
 export class TeachableCoursesService {
