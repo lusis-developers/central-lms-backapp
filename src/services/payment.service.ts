@@ -159,15 +159,6 @@ export class PaymentService {
   }
 
   async confirmAndProcess(id: string, clientTxId: string): Promise<any> {
-    
-    console.log(`[Payment] Iniciando confirmación para ID: ${id}`);
-
-    const token = process.env.PAYPHONE_TOKEN;
-    
-    // AGREGA ESTO PARA DEPURAR
-    console.log("🔑 Token usado en Backend:", token ? token.substring(0, 10) + "..." : "INDEFINIDO");
-    console.log("🆔 Confirmando ID:", id, "ClientTxId:", clientTxId);
-
     // A. Llamar a Payphone desde el Backend (Servidor a Servidor es 100% seguro)
     let payphoneData;
     try {
@@ -196,8 +187,6 @@ export class PaymentService {
       // Incluso si falla, podrías querer guardar el intento en logs, pero lanzamos error para el frontend
       throw new Error(`El pago no fue aprobado. Estado: ${payphoneData.transactionStatus}`);
     }
-
-    console.log("[Payment] Pago confirmado exitosamente en Payphone via Backend.");
 
     // C. Mapear la respuesta de Payphone a tu estructura PaymentPayload
     const payload: PaymentPayload = {
