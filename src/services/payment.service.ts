@@ -27,6 +27,7 @@ export type PaymentPayload = {
   currency?: string;
   reference?: string;
   courseIds?: Array<number | string> | null;
+  name?: string;
 };
 
 export class PaymentService {
@@ -98,8 +99,8 @@ export class PaymentService {
 
     } else {
       // NEW USER LOGIC
-      let name = "User";
-      if (typeof payload.reference === "string") {
+      let name = payload.name || "User";
+      if (!payload.name && typeof payload.reference === "string") {
         const parts = payload.reference.split(" - ").map(s => s.trim());
         if (parts.length >= 3) name = parts[parts.length - 2];
       }
@@ -158,7 +159,7 @@ export class PaymentService {
     }
   }
 
-  async confirmAndProcess(id: string, clientTxId: string): Promise<any> {
+  async confirmAndProcess(id: string, clientTxId: string, userEmail?: string, userName?: string): Promise<any> {
     // A. Llamar a Payphone desde el Backend (Servidor a Servidor es 100% seguro)
     let payphoneData;
     try {
@@ -190,7 +191,7 @@ export class PaymentService {
 
     // C. Mapear la respuesta de Payphone a tu estructura PaymentPayload
     const payload: PaymentPayload = {
-      email: payphoneData.email || payphoneData.optionalParameter2, // Usar param opcional si el email principal viene vacío
+      email: userEmail || payphoneData.email || payphoneData.optionalParameter2, // Usar param opcional si el email principal viene vacío
       transactionStatus: payphoneData.transactionStatus,
       statusCode: payphoneData.statusCode,
       authorizationCode: payphoneData.authorizationCode,
@@ -198,6 +199,7 @@ export class PaymentService {
       amount: (payphoneData.amount / 100), // Payphone devuelve centavos, convertimos a dólares
       currency: payphoneData.currency,
       reference: payphoneData.reference,
+      name: userName, // Agregar name
       // courseIds se puede inferir del producto o reference si es necesario
     };
 
