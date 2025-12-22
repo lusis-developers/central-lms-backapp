@@ -3,6 +3,7 @@ import { TeachableUsersService, TeachableCoursesService } from "./teachable";
 import { EmailService } from "./email.service";
 import type { IUser, CourseAccess } from "../types/user";
 import type { CreateUserBodyParam, EnrollUserBodyParam } from "@api/teachable/types";
+import axios from "axios";
 
 // Utils
 const randomPassword = (length: number): string => {
@@ -155,6 +156,64 @@ export class PaymentService {
 
       return { user: user.toObject(), isNew: true };
     }
+  }
+
+  async confirmAndProcess(id: string, clientTxId: string): Promise<any> {
+    
+    console.log(`[Payment] Iniciando confirmación para ID: ${id}`);
+
+    const token = process.env.PAYPHONE_TOKEN;
+    
+    // AGREGA ESTO PARA DEPURAR
+    console.log("🔑 Token usado en Backend:", token ? token.substring(0, 10) + "..." : "INDEFINIDO");
+    console.log("🆔 Confirmando ID:", id, "ClientTxId:", clientTxId);
+
+    // A. Llamar a Payphone desde el Backend (Servidor a Servidor es 100% seguro)
+    let payphoneData;
+    try {
+      const response = await axios.post(
+        'https://pay.payphonetodoesposible.com/api/button/V2/Confirm',
+        {
+          id: Number(id),
+          clientTxId: clientTxId
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.PAYPHONE_TOKEN}`, // Asegúrate que esto esté en tu .env del backend
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      payphoneData = response.data;
+    } catch (error: any) {
+      console.error("[Payment] Error conectando con Payphone:", error.response?.data || error.message);
+      throw new Error("Error de comunicación con pasarela de pagos.");
+    }
+
+    // B. Verificar si Payphone aprobó
+    if (payphoneData.statusCode !== 3) {
+      console.warn(`[Payment] Pago rechazado o pendiente. Status: ${payphoneData.statusCode}`);
+      // Incluso si falla, podrías querer guardar el intento en logs, pero lanzamos error para el frontend
+      throw new Error(`El pago no fue aprobado. Estado: ${payphoneData.transactionStatus}`);
+    }
+
+    console.log("[Payment] Pago confirmado exitosamente en Payphone via Backend.");
+
+    // C. Mapear la respuesta de Payphone a tu estructura PaymentPayload
+    const payload: PaymentPayload = {
+      email: payphoneData.email || payphoneData.optionalParameter2, // Usar param opcional si el email principal viene vacío
+      transactionStatus: payphoneData.transactionStatus,
+      statusCode: payphoneData.statusCode,
+      authorizationCode: payphoneData.authorizationCode,
+      transactionId: payphoneData.transactionId,
+      amount: (payphoneData.amount / 100), // Payphone devuelve centavos, convertimos a dólares
+      currency: payphoneData.currency,
+      reference: payphoneData.reference,
+      // courseIds se puede inferir del producto o reference si es necesario
+    };
+
+    // D. Ejecutar tu lógica existente de Teachable/Mongo
+    return this.processPaymentRegistration(payload);
   }
 
   // Helper to enroll existing user in list of courses
