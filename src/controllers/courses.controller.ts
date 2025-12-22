@@ -677,7 +677,7 @@ export async function enrollAllUsersToAllCourses(
 
     while (true) {
       const users = await models.users
-        .find({}, { teachableUserId: 1, courses: 1 })
+        .find({ accountType: "founder" }, { teachableUserId: 1, courses: 1 })
         .skip(skip)
         .limit(batchSize)
         .lean();
@@ -723,10 +723,91 @@ export async function enrollAllUsersToAllCourses(
       skip += users.length;
     }
 
-    res.status(HttpStatusCode.Ok).send({ message: "All users enrolled to all courses successfully.", processedUsers, enrolledCount: enrolledOperations });
+    res.status(HttpStatusCode.Ok).send({ message: "All founders enrolled to all courses successfully.", processedUsers, enrolledCount: enrolledOperations });
     return;
   } catch (error: any) {
-    console.error("Error enrolling all users to all courses", error);
+    console.error("Error enrolling all founders to all courses", error);
+    res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
+    return;
+  }
+}
+
+export async function revokeAccessForNonFounders(
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const usersService = new TeachableUsersService();
+    const batchSize = 50; // Smaller batch for safety
+    const concurrency = 3;
+    let processedUsers = 0;
+    let revokedOperations = 0;
+
+    console.log("Starting revocation process for non-founders...");
+
+    while (true) {
+      // Find users who are NOT founders and have at least one course
+      // We keep skip at 0 because we are modifying documents to no longer match the query
+      const users = await models.users
+        .find(
+          { 
+            accountType: { $ne: "founder" }, 
+            courses: { $exists: true, $not: { $size: 0 } } 
+          }, 
+          { teachableUserId: 1, courses: 1 }
+        )
+        .limit(batchSize);
+
+      if (!users || users.length === 0) break;
+      processedUsers += users.length;
+      console.log(`Processing batch of ${users.length} users...`);
+
+      const tasks = users.map((u) => async () => {
+        const tId = Number(u.teachableUserId);
+        const coursesToRevoke = u.courses || [];
+        
+        if (coursesToRevoke.length === 0) return;
+
+        // Revoke in Teachable if valid teachableUserId
+        if (Number.isFinite(tId) && tId > 0) {
+          for (const course of coursesToRevoke) {
+             const cId = Number(course.teachableCourseId);
+             if (Number.isFinite(cId) && cId > 0) {
+                try {
+                  await usersService.unenrollUser({ user_id: tId, course_id: cId });
+                  revokedOperations++;
+                } catch (err) {
+                  // Ignore 404s (already unenrolled)
+                  console.error(`Failed to unenroll user ${tId} from course ${cId}`, err);
+                }
+             }
+          }
+        }
+
+        // Update local DB: Remove all courses
+        u.courses = [];
+        await u.save();
+      });
+
+      let i = 0;
+      const runners: Promise<void>[] = [];
+      while (i < tasks.length) {
+        const slice = tasks.slice(i, i + concurrency);
+        runners.push(Promise.all(slice.map((fn) => fn())).then(() => {}));
+        i += concurrency;
+      }
+      for (const r of runners) await r;
+    }
+
+    res.status(HttpStatusCode.Ok).send({ 
+      message: "Revocation process completed successfully.", 
+      processedUsers, 
+      revokedOperations 
+    });
+    return;
+  } catch (error: any) {
+    console.error("Error revoking access for non-founders", error);
     res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
     return;
   }
