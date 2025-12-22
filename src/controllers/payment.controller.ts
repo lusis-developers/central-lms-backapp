@@ -8,7 +8,7 @@ export async function confirmPayment(
   _next: NextFunction,
 ): Promise<void> {
   try {
-    const { id, clientTransactionId } = req.body;
+    const { id, clientTransactionId, email, name } = req.body;
 
     // Basic validation
     if (!id || !clientTransactionId) {
@@ -22,6 +22,8 @@ export async function confirmPayment(
     const result = await service.confirmAndProcess(
       String(id),
       String(clientTransactionId),
+      email,
+      name,
     );
 
     res.status(HttpStatusCode.Ok).send({
