@@ -24,7 +24,6 @@ export default function createApp() {
   const corsOptions = {
     origin: function (origin: any, callback: any) {
       const normalizedOrigin = origin?.replace(/\/$/, "");
-      console.log("🟡 Origin recibido:", origin);
 
       if (!origin || whitelist.includes(normalizedOrigin)) {
         callback(null, true);
@@ -37,11 +36,6 @@ export default function createApp() {
   };
 
   app.use(cors(corsOptions));
-
-  app.use((req, res, next) => {
-    console.log(`🌐 Petición desde: ${req.headers.origin}`);
-    next();
-  });
 
   app.use(express.json({ limit: "50mb" }));
 

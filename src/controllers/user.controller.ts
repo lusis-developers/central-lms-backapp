@@ -237,7 +237,6 @@ export async function getUserById(
 ): Promise<void> {
   try {
     const { userId } = req.params as { userId: string };
-    console.log('esto se corre ahora que reacrgeu')
 
     if (!userId || !Types.ObjectId.isValid(userId)) {
       res.status(HttpStatusCode.BadRequest).send({ message: "Invalid parameter. A valid userId is required." });
@@ -773,57 +772,38 @@ export async function requestPasswordRecovery(
 ): Promise<void> {
   try {
     const { email } = (req.body || {}) as { email?: string };
-    console.log("--> requestPasswordRecovery called with email:", email);
 
     if (!email) {
-      console.log("--> Email is missing in payload");
       res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. Email is required." });
       return;
     }
 
     const trimmedEmail = email.trim();
-    console.log("--> Searching for user with email:", trimmedEmail);
 
     const user = await models.users.findOne({ email: trimmedEmail });
-
     if (!user) {
-      console.log("--> User NOT found for email:", trimmedEmail);
-      // To prevent email enumeration, we can return OK but do nothing.
-      // However, for better UX in some cases we might want to tell them.
-      // Let's assume standard security practice: return OK even if not found.
-      // Or if the client specifically asked to know, we can return 404.
-      // Given the prompt "si existe enviar un correo... y guardarlo en la base de datos",
-      // implying we proceed only if exists. Let's return OK generic message.
-      res.status(HttpStatusCode.Ok).send({ message: "If the email exists, a recovery link has been sent." });
+      res.status(HttpStatusCode.NotFound).send({ message: "User not found." });
       return;
     }
 
-    console.log("--> User FOUND:", user._id);
-
-    const token = randomPassword(32); // Simple random string token
-    const expires = new Date(Date.now() + 3600000); // 1 hour expiration
+    // Generate token
+    const token = randomPassword(32);
+    const expires = new Date(Date.now() + 3600000); // 1 hour
 
     user.recoveryToken = token;
     user.recoveryTokenExpires = expires;
     await user.save();
-    console.log("--> Token generated and saved for user:", user._id);
 
+    // Send email
     const emailService = new EmailService();
-    // We don't wait for email to send to return response to avoid blocking if email service is slow,
-    // but here we should probably await to ensure it works, or catch error.
     try {
-      console.log("--> Attempting to send recovery email to:", user.email);
       await emailService.sendPasswordRecovery(user.email, user.name, token);
-      console.log("--> Recovery email sent successfully");
     } catch (err) {
-      console.error("--> Error sending recovery email", err);
-      // If email fails, we might want to revert token? or just let it expire.
-      // Let's return 500 if email fails so user knows to retry.
-      res.status(HttpStatusCode.InternalServerError).send({ message: "Error sending email." });
-      return;
+      console.error("Error sending recovery email", err);
+      // Don't fail the request, just log error
     }
 
-    res.status(HttpStatusCode.Ok).send({ message: "If the email exists, a recovery link has been sent." });
+    res.status(HttpStatusCode.Ok).send({ message: "Recovery email sent." });
     return;
   } catch (error) {
     console.error("Error requesting password recovery", error);
@@ -851,7 +831,6 @@ export async function resetPassword(
     });
 
     if (!user) {
-      console.log("--> Token is invalid or expired.");
       res.status(HttpStatusCode.BadRequest).send({ message: "Invalid or expired token." });
       return;
     }
