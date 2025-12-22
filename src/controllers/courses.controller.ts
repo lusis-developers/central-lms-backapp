@@ -744,8 +744,6 @@ export async function revokeAccessForNonFounders(
     let processedUsers = 0;
     let revokedOperations = 0;
 
-    console.log("Starting revocation process for non-founders...");
-
     while (true) {
       // Find users who are NOT founders and have at least one course
       // We keep skip at 0 because we are modifying documents to no longer match the query
@@ -761,7 +759,6 @@ export async function revokeAccessForNonFounders(
 
       if (!users || users.length === 0) break;
       processedUsers += users.length;
-      console.log(`Processing batch of ${users.length} users...`);
 
       const tasks = users.map((u) => async () => {
         const tId = Number(u.teachableUserId);
