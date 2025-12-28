@@ -34,8 +34,10 @@ export class EnrollmentService {
     while (true) {
       try {
         const response = await this.coursesService.listCourses({ page, per: perDefault });
-        const courses = response.data ?? [];
-        if (!Array.isArray(courses) || courses.length === 0) break;
+        const rawData = response.data;
+        const courses = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.courses) ? rawData.courses : []);
+
+        if (courses.length === 0) break;
         allCourses.push(...courses);
         if (courses.length < perDefault) break;
         page++;
@@ -78,7 +80,7 @@ export class EnrollmentService {
         }
       } catch (error: any) {
         const status = error?.status || error?.response?.status;
-        const msg = (error?.data?.message || error?.message || "").toLowerCase();
+        const msg = (error?.data?.message || (error?.response?.data as any)?.message || error?.message || "").toLowerCase();
 
         // If already enrolled, consider it a success for local sync
         if (status === 422 || msg.includes("already enrolled")) {
@@ -118,11 +120,13 @@ export class EnrollmentService {
     while (true) {
       try {
         const resCourses = await this.coursesService.listCourses({ page, per: perDefault });
-        const data = resCourses.data ?? [];
-        if (!Array.isArray(data) || data.length === 0) break;
-        const ids = data.map((c: any) => Number(c.id)).filter((n) => n > 0);
+        const rawData = resCourses.data;
+        const courses = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.courses) ? rawData.courses : []);
+
+        if (courses.length === 0) break;
+        const ids = courses.map((c: any) => Number(c.id)).filter((n: number) => n > 0);
         collectedIds.push(...ids);
-        if (data.length < perDefault) break;
+        if (courses.length < perDefault) break;
         page++;
       } catch (_err) {
         break;
@@ -175,7 +179,7 @@ export class EnrollmentService {
             hasNewEnrollment = true;
           } catch (error: any) {
             const status = error?.status || error?.response?.status;
-            const msg = (error?.data?.message || error?.message || "").toLowerCase();
+            const msg = (error?.data?.message || (error?.response?.data as any)?.message || error?.message || "").toLowerCase();
             if (status === 422 || msg.includes("already enrolled")) {
               user.courses.push({
                 teachableCourseId: cid,
