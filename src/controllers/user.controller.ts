@@ -98,35 +98,6 @@ export async function createUser(
   }
 }
 
-export async function upgradeAllToFounder(
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-): Promise<void> {
-  try {
-    // Update all users who are not already founder
-    const result = await models.users.updateMany(
-      {},
-      { $set: { accountType: "founder" } }
-    );
-
-    // Trigger mass enrollment in background
-    const enrollmentService = new EnrollmentService();
-    enrollmentService.enrollAllFoundersInAllCourses().catch(err => {
-      console.error("Error in background enrollment for upgrade-all:", err);
-    });
-
-    res.status(HttpStatusCode.Ok).send({
-      message: "All users have been upgraded to founder successfully.",
-      modifiedCount: result.modifiedCount
-    });
-    return;
-  } catch (error) {
-    console.error("Error upgrading all users to founder", error);
-    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
-    return;
-  }
-}
 
 export async function deleteUser(
   req: Request,
