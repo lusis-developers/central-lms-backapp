@@ -4,6 +4,7 @@ import { Types } from "mongoose";
 import { models } from "../models";
 import { TeachableCoursesService, TeachableUsersService } from "../services/teachable";
 import { PointsService } from "../services/points";
+import { EnrollmentService } from "../services/enrollment.service";
 
 function parsePositiveNumber(value: any): number | undefined {
   const n = Number(value);
@@ -184,9 +185,16 @@ export async function enrollUserToAllCourses(
 ): Promise<void> {
   try {
     const { userId } = (req.params || {}) as Record<string, any>;
-    const { teachableUserId } = (req.query || {}) as Record<string, any>;
 
-    const finalTeachableUserId = await resolveTeachableUserId(userId, teachableUserId);
+    if (userId && Types.ObjectId.isValid(userId)) {
+      const enrollmentService = new EnrollmentService();
+      const { enrolled, failed } = await enrollmentService.enrollUserInAllAvailableCourses(userId);
+      res.status(HttpStatusCode.Ok).send({ message: "User enrolled in all courses successfully.", enrolledCourseIds: enrolled, failedCourseIds: failed });
+      return;
+    }
+
+    const { teachableUserId } = (req.query || {}) as Record<string, any>;
+    const finalTeachableUserId = await resolveTeachableUserId(undefined, teachableUserId);
     if (!finalTeachableUserId) {
       res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. A valid teachableUserId or userId is required." });
       return;
@@ -238,19 +246,6 @@ export async function enrollUserToAllCourses(
         const reason: any = (r as any).reason;
         const cid = Number(reason?.course_id ?? reason?.metadata?.course_id);
         if (Number.isFinite(cid) && cid > 0) failedCourseIds.push(cid);
-      }
-    }
-
-    if (userId && Types.ObjectId.isValid(userId)) {
-      const localUser = await models.users.findById(userId);
-      if (localUser) {
-        for (const cid of enrolledCourseIds) {
-          const exists = (localUser.courses || []).some((c: any) => Number(c.teachableCourseId) === Number(cid));
-          if (!exists) {
-            localUser.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
-          }
-        }
-        await localUser.save();
       }
     }
 
@@ -632,98 +627,10 @@ export async function enrollAllUsersToAllCourses(
   _next: NextFunction,
 ): Promise<void> {
   try {
-    const coursesService = new TeachableCoursesService();
-    const usersService = new TeachableUsersService();
+    const enrollmentService = new EnrollmentService();
+    const result = await enrollmentService.enrollAllFoundersInAllCourses();
 
-    const perDefault = 200;
-    let page = 1;
-    const collectedIds: number[] = [];
-    while (true) {
-      let data: any[] = [];
-      try {
-        const resCourses = await coursesService.listCourses({ page, per: perDefault } as any);
-        data = (resCourses as any)?.data ?? [];
-      } catch (_err) {
-        break;
-      }
-      const ids = (Array.isArray(data) ? data : [])
-        .map((c: any) => Number((c as any)?.id))
-        .filter((n: number) => Number.isFinite(n) && n > 0);
-      if (ids.length === 0) break;
-      collectedIds.push(...ids);
-      if (ids.length < perDefault) break;
-      page += 1;
-    }
-
-    let courseIds = Array.from(new Set(collectedIds));
-    if (courseIds.length === 0) {
-      const name = "FudMasters Growth Essentials";
-      const career = await models.careers.findOne({ name }).lean();
-      const localIds: number[] = Array.isArray((career as any)?.courseIds)
-        ? (career as any).courseIds.map((v: any) => Number(v)).filter((n: number) => Number.isFinite(n) && n > 0)
-        : [];
-      courseIds = Array.from(new Set(localIds));
-    }
-    if (courseIds.length === 0) {
-      res.status(HttpStatusCode.Ok).send({ message: "No courses available to enroll.", processedUsers: 0, enrolledCount: 0 });
-      return;
-    }
-
-    const batchSize = 200;
-    const concurrency = 3;
-    let skip = 0;
-    let processedUsers = 0;
-    let enrolledOperations = 0;
-
-    while (true) {
-      const users = await models.users
-        .find({ accountType: "founder" }, { teachableUserId: 1, courses: 1 })
-        .skip(skip)
-        .limit(batchSize)
-        .lean();
-      if (!users || users.length === 0) break;
-      processedUsers += users.length;
-
-      const tasks = users.map((u: any) => async () => {
-        const tId = Number(u?.teachableUserId);
-        if (!Number.isFinite(tId) || tId <= 0) return;
-        const owned = Array.isArray(u?.courses)
-          ? u.courses
-              .map((c: any) => Number(c?.teachableCourseId))
-              .filter((n: number) => Number.isFinite(n) && n > 0)
-          : [];
-        const missing = courseIds.filter((id) => !owned.includes(id));
-        if (missing.length === 0) return;
-        for (const cid of missing) {
-          try {
-            await usersService.enrollUser({ user_id: tId, course_id: cid } as any);
-            enrolledOperations += 1;
-          } catch (_err) {}
-        }
-        const localUser = await models.users.findById(u._id);
-        if (localUser) {
-          for (const cid of missing) {
-            const exists = (localUser.courses || []).some((c: any) => Number(c.teachableCourseId) === Number(cid));
-            if (!exists) {
-              localUser.courses.push({ teachableCourseId: cid, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
-            }
-          }
-          await localUser.save();
-        }
-      });
-
-      let i = 0;
-      const runners: Promise<void>[] = [];
-      while (i < tasks.length) {
-        const slice = tasks.slice(i, i + concurrency);
-        runners.push(Promise.all(slice.map((fn) => fn())).then(() => {}));
-        i += concurrency;
-      }
-      for (const r of runners) await r;
-      skip += users.length;
-    }
-
-    res.status(HttpStatusCode.Ok).send({ message: "All founders enrolled to all courses successfully.", processedUsers, enrolledCount: enrolledOperations });
+    res.status(HttpStatusCode.Ok).send({ message: "All founders enrolled to all courses successfully.", processedUsers: result.processedUsers, enrolledCount: result.enrolledCount });
     return;
   } catch (error: any) {
     console.error("Error enrolling all founders to all courses", error);
@@ -749,10 +656,10 @@ export async function revokeAccessForNonFounders(
       // We keep skip at 0 because we are modifying documents to no longer match the query
       const users = await models.users
         .find(
-          { 
-            accountType: { $ne: "founder" }, 
-            courses: { $exists: true, $not: { $size: 0 } } 
-          }, 
+          {
+            accountType: { $ne: "founder" },
+            courses: { $exists: true, $not: { $size: 0 } }
+          },
           { teachableUserId: 1, courses: 1 }
         )
         .limit(batchSize);
@@ -763,22 +670,22 @@ export async function revokeAccessForNonFounders(
       const tasks = users.map((u) => async () => {
         const tId = Number(u.teachableUserId);
         const coursesToRevoke = u.courses || [];
-        
+
         if (coursesToRevoke.length === 0) return;
 
         // Revoke in Teachable if valid teachableUserId
         if (Number.isFinite(tId) && tId > 0) {
           for (const course of coursesToRevoke) {
-             const cId = Number(course.teachableCourseId);
-             if (Number.isFinite(cId) && cId > 0) {
-                try {
-                  await usersService.unenrollUser({ user_id: tId, course_id: cId });
-                  revokedOperations++;
-                } catch (err) {
-                  // Ignore 404s (already unenrolled)
-                  console.error(`Failed to unenroll user ${tId} from course ${cId}`, err);
-                }
-             }
+            const cId = Number(course.teachableCourseId);
+            if (Number.isFinite(cId) && cId > 0) {
+              try {
+                await usersService.unenrollUser({ user_id: tId, course_id: cId });
+                revokedOperations++;
+              } catch (err) {
+                // Ignore 404s (already unenrolled)
+                console.error(`Failed to unenroll user ${tId} from course ${cId}`, err);
+              }
+            }
           }
         }
 
@@ -791,16 +698,16 @@ export async function revokeAccessForNonFounders(
       const runners: Promise<void>[] = [];
       while (i < tasks.length) {
         const slice = tasks.slice(i, i + concurrency);
-        runners.push(Promise.all(slice.map((fn) => fn())).then(() => {}));
+        runners.push(Promise.all(slice.map((fn) => fn())).then(() => { }));
         i += concurrency;
       }
       for (const r of runners) await r;
     }
 
-    res.status(HttpStatusCode.Ok).send({ 
-      message: "Revocation process completed successfully.", 
-      processedUsers, 
-      revokedOperations 
+    res.status(HttpStatusCode.Ok).send({
+      message: "Revocation process completed successfully.",
+      processedUsers,
+      revokedOperations
     });
     return;
   } catch (error: any) {

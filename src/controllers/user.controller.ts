@@ -8,6 +8,7 @@ import { TeachableUsersService } from "../services/teachable";
 import { EmailService } from "../services/email.service";
 import type { IUser, CourseAccess } from "../types/user";
 import type { CreateUserBodyParam, EnrollUserBodyParam } from "@api/teachable/types";
+import { EnrollmentService } from "../services/enrollment.service";
 
 type CreateUserRequestBody = {
   name?: string;
@@ -105,13 +106,19 @@ export async function upgradeAllToFounder(
   try {
     // Update all users who are not already founder
     const result = await models.users.updateMany(
-      {}, 
+      {},
       { $set: { accountType: "founder" } }
     );
 
-    res.status(HttpStatusCode.Ok).send({ 
-      message: "All users have been upgraded to founder successfully.", 
-      modifiedCount: result.modifiedCount 
+    // Trigger mass enrollment in background
+    const enrollmentService = new EnrollmentService();
+    enrollmentService.enrollAllFoundersInAllCourses().catch(err => {
+      console.error("Error in background enrollment for upgrade-all:", err);
+    });
+
+    res.status(HttpStatusCode.Ok).send({
+      message: "All users have been upgraded to founder successfully.",
+      modifiedCount: result.modifiedCount
     });
     return;
   } catch (error) {
@@ -305,13 +312,13 @@ export async function checkUserByEmail(
     // Check if user has a paid account type (anything other than "free")
     // If they have a paid account (premium, student, founder), we pretend they don't exist 
     // to allow the frontend to proceed with a purchase/registration flow without blocking.
-    
+
     const accountType = user.accountType || "free";
-    
+
     // If account type is NOT free, we return exists: false to allow the process to continue
     if (accountType !== "free") {
-       res.status(HttpStatusCode.Ok).send({ message: "User not found (masked).", exists: false });
-       return;
+      res.status(HttpStatusCode.Ok).send({ message: "User not found (masked).", exists: false });
+      return;
     }
 
     const safeUser = {
@@ -387,6 +394,14 @@ export async function loginUser(
       updatedAt: user.updatedAt,
     };
 
+    // Auto-enroll founder if needed
+    if (user.accountType === "founder") {
+      const enrollmentService = new EnrollmentService();
+      enrollmentService.enrollUserInAllAvailableCourses(user._id.toString()).catch(err => {
+        console.error("Error auto-enrolling founder on login:", err);
+      });
+    }
+
     res.status(HttpStatusCode.Ok).send({ message: "Login successful.", token, user: safeUser });
     return;
   } catch (error) {
@@ -447,6 +462,14 @@ export async function registerFromPayment(
       updatedAt: user.updatedAt,
       accountType: user.accountType || "free"
     };
+
+    // Auto-enroll founder if needed
+    if (user.accountType === "founder") {
+      const enrollmentService = new EnrollmentService();
+      enrollmentService.enrollUserInAllAvailableCourses(user._id.toString()).catch(err => {
+        console.error("Error auto-enrolling founder on registration:", err);
+      });
+    }
 
     if (isNew) {
       res.status(HttpStatusCode.Created).send({ message: "User created and email sent successfully.", user: safeUser });
@@ -912,8 +935,8 @@ export async function loginWithGoogle(
     const firebaseUser = (req as any).user;
 
     if (!firebaseUser) {
-       res.status(HttpStatusCode.Unauthorized).send({ message: "User not authenticated via Google." });
-       return;
+      res.status(HttpStatusCode.Unauthorized).send({ message: "User not authenticated via Google." });
+      return;
     }
 
     const { email, name, picture } = firebaseUser;
@@ -928,9 +951,9 @@ export async function loginWithGoogle(
     if (!user) {
       // Create User if not exists
       const password = randomPassword(32);
-      user = await models.users.create({ 
-        name: name || "Google User", 
-        email, 
+      user = await models.users.create({
+        name: name || "Google User",
+        email,
         password,
         accountType: "free"
       });
