@@ -1,6 +1,8 @@
 import { models } from "../models";
 import { TeachableCoursesService, TeachableUsersService } from "./teachable";
 import { Types } from "mongoose";
+import type { TeachableCourse } from "../types/teachable";
+import type { CourseAccess } from "../types/user";
 
 export class EnrollmentService {
   private coursesService: TeachableCoursesService;
@@ -29,13 +31,14 @@ export class EnrollmentService {
     // Get all available courses from Teachable
     const perDefault = 200;
     let page = 1;
-    const allCourses: any[] = [];
+    const allCourses: TeachableCourse[] = [];
 
     while (true) {
       try {
         const response = await this.coursesService.listCourses({ page, per: perDefault });
         const rawData = response.data;
-        const courses = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.courses) ? rawData.courses : []);
+        // The API might return an array or an object with a courses property
+        const courses = Array.isArray(rawData) ? rawData : (Array.isArray((rawData as any)?.courses) ? (rawData as any).courses : []);
 
         if (courses.length === 0) break;
         allCourses.push(...courses);
@@ -47,10 +50,10 @@ export class EnrollmentService {
       }
     }
 
-    const uniqueCourseIds = Array.from(new Set(allCourses.map((c: any) => Number(c.id)).filter((id) => id > 0)));
+    const uniqueCourseIds = Array.from(new Set(allCourses.map((c: TeachableCourse) => Number(c.id)).filter((id) => id > 0)));
     const currentlyEnrolledIds = (user.courses || [])
-      .filter((c: any) => c.status === "active")
-      .map((c: any) => Number(c.teachableCourseId));
+      .filter((c: CourseAccess) => c.status === "active")
+      .map((c: CourseAccess) => Number(c.teachableCourseId));
 
     const missingCourseIds = uniqueCourseIds.filter((id) => !currentlyEnrolledIds.includes(id));
 
@@ -68,7 +71,7 @@ export class EnrollmentService {
         enrolled.push(cid);
 
         // Update local user object
-        const exists = (user.courses || []).some((c: any) => Number(c.teachableCourseId) === cid);
+        const exists = (user.courses || []).some((c: CourseAccess) => Number(c.teachableCourseId) === cid);
         if (!exists) {
           user.courses.push({
             teachableCourseId: cid,
@@ -76,16 +79,17 @@ export class EnrollmentService {
             enrolledAt: new Date(),
             expiresAt: null,
             courseRef: null,
-          } as any);
+          } as CourseAccess);
         }
       } catch (error: any) {
-        const status = error?.status || error?.response?.status;
-        const msg = (error?.data?.message || (error?.response?.data as any)?.message || error?.message || "").toLowerCase();
+        const err = error as { status?: number; response?: { status?: number; data?: { message?: string } }; data?: { message?: string }; message?: string };
+        const status = err?.status || err?.response?.status;
+        const msg = (err?.data?.message || err?.response?.data?.message || err?.message || "").toLowerCase();
 
         // If already enrolled, consider it a success for local sync
         if (status === 422 || msg.includes("already enrolled")) {
           enrolled.push(cid);
-          const exists = (user.courses || []).some((c: any) => Number(c.teachableCourseId) === cid);
+          const exists = (user.courses || []).some((c: CourseAccess) => Number(c.teachableCourseId) === cid);
           if (!exists) {
             user.courses.push({
               teachableCourseId: cid,
@@ -93,7 +97,7 @@ export class EnrollmentService {
               enrolledAt: new Date(),
               expiresAt: null,
               courseRef: null,
-            } as any);
+            } as CourseAccess);
           }
         } else {
           console.error(`Failed to enroll user ${tId} in course ${cid}:`, error);
@@ -121,10 +125,10 @@ export class EnrollmentService {
       try {
         const resCourses = await this.coursesService.listCourses({ page, per: perDefault });
         const rawData = resCourses.data;
-        const courses = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.courses) ? rawData.courses : []);
+        const courses = Array.isArray(rawData) ? rawData : (Array.isArray((rawData as any)?.courses) ? (rawData as any).courses : []);
 
         if (courses.length === 0) break;
-        const ids = courses.map((c: any) => Number(c.id)).filter((n: number) => n > 0);
+        const ids = courses.map((c: TeachableCourse) => Number(c.id)).filter((n: number) => n > 0);
         collectedIds.push(...ids);
         if (courses.length < perDefault) break;
         page++;
@@ -157,8 +161,8 @@ export class EnrollmentService {
         if (!tId) continue;
 
         const owned = (user.courses || [])
-          .filter((c: any) => c.status === "active")
-          .map((c: any) => Number(c.teachableCourseId));
+          .filter((c: CourseAccess) => c.status === "active")
+          .map((c: CourseAccess) => Number(c.teachableCourseId));
 
         const missing = courseIds.filter((id) => !owned.includes(id));
         if (missing.length === 0) continue;
@@ -175,11 +179,12 @@ export class EnrollmentService {
               enrolledAt: new Date(),
               expiresAt: null,
               courseRef: null,
-            } as any);
+            } as CourseAccess);
             hasNewEnrollment = true;
           } catch (error: any) {
-            const status = error?.status || error?.response?.status;
-            const msg = (error?.data?.message || (error?.response?.data as any)?.message || error?.message || "").toLowerCase();
+            const err = error as { status?: number; response?: { status?: number; data?: { message?: string } }; data?: { message?: string }; message?: string };
+            const status = err?.status || err?.response?.status;
+            const msg = (err?.data?.message || err?.response?.data?.message || err?.message || "").toLowerCase();
             if (status === 422 || msg.includes("already enrolled")) {
               user.courses.push({
                 teachableCourseId: cid,
@@ -187,7 +192,7 @@ export class EnrollmentService {
                 enrolledAt: new Date(),
                 expiresAt: null,
                 courseRef: null,
-              } as any);
+              } as CourseAccess);
               hasNewEnrollment = true;
             }
           }

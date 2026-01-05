@@ -5,14 +5,16 @@ import { models } from "../models";
 import { TeachableCoursesService, TeachableUsersService } from "../services/teachable";
 import { PointsService } from "../services/points";
 import { EnrollmentService } from "../services/enrollment.service";
+import type { TeachableCourse } from "../types/teachable";
+import type { CourseAccess } from "../types/user";
 
-function parsePositiveNumber(value: any): number | undefined {
+function parsePositiveNumber(value: unknown): number | undefined {
   const n = Number(value);
   if (Number.isNaN(n) || n <= 0) return undefined;
   return n;
 }
 
-function parseBoolean(value: any): boolean | undefined {
+function parseBoolean(value: unknown): boolean | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {
@@ -29,7 +31,7 @@ export async function getCourses(
   _next: NextFunction,
 ): Promise<void> {
   try {
-    const { name, is_published, author_bio_id, created_at, page, per } = (req.query || {}) as Record<string, any>;
+    const { name, is_published, author_bio_id, created_at, page, per } = (req.query || {}) as Record<string, unknown>;
     const metadata = {
       name: typeof name === "string" ? name : undefined,
       is_published: parseBoolean(is_published),
@@ -37,15 +39,16 @@ export async function getCourses(
       created_at: typeof created_at === "string" ? created_at : undefined,
       page: page ? parsePositiveNumber(page) : undefined,
       per: per ? parsePositiveNumber(per) : undefined,
-    } as any;
+    };
 
     const service = new TeachableCoursesService();
     const { data } = await service.listCourses(metadata);
     res.status(HttpStatusCode.Ok).send({ message: "Courses retrieved successfully.", courses: data });
     return;
   } catch (error: any) {
-    console.error("Error fetching courses", error);
-    res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
+    const err = error as { status?: number; message?: string };
+    console.error("Error fetching courses", err);
+    res.status(err?.status || HttpStatusCode.InternalServerError).send({ message: err?.message || "Internal server error." });
     return;
   }
 }
@@ -68,8 +71,8 @@ export async function getEnrolledCoursesForUser(
         return;
       }
       courseIds = (user.courses || [])
-        .filter((c: any) => c && c.status === "active")
-        .map((c: any) => Number(c.teachableCourseId))
+        .filter((c) => c && c.status === "active")
+        .map((c) => Number(c.teachableCourseId))
         .filter((n: number) => Number.isFinite(n) && n > 0);
     } else {
       const tId = parsePositiveNumber(teachableUserId);
@@ -78,10 +81,10 @@ export async function getEnrolledCoursesForUser(
         return;
       }
       const usersService = new TeachableUsersService();
-      const { data } = await usersService.showUser({ user_id: tId } as any);
-      const enrollments = (data as any)?.enrollments || [];
+      const { data } = await usersService.showUser({ user_id: tId });
+      const enrollments = (data as { enrollments?: Array<{ course_id: number }> })?.enrollments || [];
       courseIds = enrollments
-        .map((e: any) => Number(e?.course_id))
+        .map((e) => Number(e?.course_id))
         .filter((n: number) => Number.isFinite(n) && n > 0);
     }
 
@@ -96,25 +99,26 @@ export async function getEnrolledCoursesForUser(
     const results = await Promise.all(
       courseIds.map(async (cid) => {
         try {
-          const { data } = await service.showCourse({ course_id: cid } as any);
+          const { data } = await service.showCourse({ course_id: cid });
           return data;
         } catch (_err) {
-          return null as any;
+          return null;
         }
       }),
     );
-    const courses = results.filter((r: any) => r != null);
+    const courses = results.filter((r) => r != null);
 
     res.status(HttpStatusCode.Ok).send({ message: "Enrolled courses retrieved successfully.", courses });
     return;
   } catch (error: any) {
-    console.error("Error fetching enrolled courses", error);
-    res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
+    const err = error as { status?: number; message?: string };
+    console.error("Error fetching enrolled courses", err);
+    res.status(err?.status || HttpStatusCode.InternalServerError).send({ message: err?.message || "Internal server error." });
     return;
   }
 }
 
-async function resolveTeachableUserId(userId?: string, teachableUserId?: any): Promise<number | undefined> {
+async function resolveTeachableUserId(userId?: string, teachableUserId?: unknown): Promise<number | undefined> {
   const parsedTeachable = parsePositiveNumber(teachableUserId);
   if (parsedTeachable) return parsedTeachable;
   if (userId && Types.ObjectId.isValid(userId)) {
@@ -125,7 +129,7 @@ async function resolveTeachableUserId(userId?: string, teachableUserId?: any): P
   return undefined;
 }
 
-async function resolveUserId(userId?: string, teachableUserId?: any): Promise<string | undefined> {
+async function resolveUserId(userId?: string, teachableUserId?: unknown): Promise<string | undefined> {
   if (userId && Types.ObjectId.isValid(userId)) return userId;
   const parsedTeachable = parsePositiveNumber(teachableUserId);
   if (parsedTeachable) {
@@ -161,7 +165,7 @@ export async function enrollUserToCourse(
     if (userId && Types.ObjectId.isValid(userId)) {
       const localUser = await models.users.findById(userId);
       if (localUser) {
-        const exists = (localUser.courses || []).some((c: any) => Number(c.teachableCourseId) === Number(courseIdNum));
+        const exists = (localUser.courses || []).some((c: CourseAccess) => Number(c.teachableCourseId) === Number(courseIdNum));
         if (!exists) {
           localUser.courses.push({ teachableCourseId: courseIdNum, status: "active", enrolledAt: new Date(), expiresAt: null, courseRef: null });
           await localUser.save();
@@ -216,7 +220,7 @@ export async function enrollUserToAllCourses(
         break;
       }
       const ids = (Array.isArray(data) ? data : [])
-        .map((c: any) => Number((c as any)?.id))
+        .map((c: TeachableCourse) => Number(c.id))
         .filter((n: number) => Number.isFinite(n) && n > 0);
       if (ids.length === 0) break;
       collectedIds.push(...ids);
