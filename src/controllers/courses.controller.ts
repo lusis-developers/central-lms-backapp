@@ -429,6 +429,46 @@ export async function getCourseProgressForUser(
     }
 
     const service = new TeachableCoursesService();
+
+    // Auto-enrollment logic for founders
+    const userIdStr = await resolveUserId(userId, teachableUserId);
+    if (userIdStr) {
+      const user = await models.users.findById(userIdStr);
+      if (user && user.accountType === "founder") {
+        const isEnrolled = (user.courses || []).some(
+          (c) => Number(c.teachableCourseId) === courseIdNum && c.status === "active"
+        );
+
+        if (!isEnrolled) {
+          const tId = Number(user.teachableUserId);
+          if (tId) {
+            try {
+              const usersService = new TeachableUsersService();
+              await usersService.enrollUser({ user_id: tId, course_id: courseIdNum });
+
+              // Sync local DB
+              const exists = (user.courses || []).some(
+                (c) => Number(c.teachableCourseId) === courseIdNum
+              );
+              if (!exists) {
+                user.courses.push({
+                  teachableCourseId: courseIdNum,
+                  status: "active",
+                  enrolledAt: new Date(),
+                  expiresAt: null,
+                  courseRef: null,
+                } as any);
+                await user.save();
+              }
+            } catch (enrollError) {
+              console.error(`Auto-enrollment failed for founder ${userIdStr} in course ${courseIdNum}:`, enrollError);
+              // We continue because they might still have access in Teachable or we want to show the error from courseProgress
+            }
+          }
+        }
+      }
+    }
+
     const { data } = await service.courseProgress({ course_id: courseIdNum, user_id: finalTeachableUserId, page: page ? parsePositiveNumber(page) : undefined, per: per ? parsePositiveNumber(per) : undefined } as any);
     res.status(HttpStatusCode.Ok).send({ message: "Course progress retrieved successfully.", progress: data });
     return;
@@ -716,6 +756,19 @@ export async function revokeAccessForNonFounders(
     return;
   } catch (error: any) {
     console.error("Error revoking access for non-founders", error);
+    res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
+    return;
+  }
+}
+
+
+export async function notificationNewCourseForUsers(req: Request, res: Response, _next: NextFunction): Promise<void> {
+  try {
+
+
+
+  } catch (error: any) {
+    console.error("Error notifying new course for users", error);
     res.status(error?.status || HttpStatusCode.InternalServerError).send({ message: error?.message || "Internal server error." });
     return;
   }
