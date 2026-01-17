@@ -10,6 +10,9 @@ const CourseAccessSchema = new Schema<CourseAccess>(
     expiresAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
     courseRef: { type: Schema.Types.ObjectId, ref: "courses", default: null },
+    lastAccessedAt: { type: Date, default: null },
+    totalLectures: { type: Number, default: 0 },
+    completedLecturesCount: { type: Number, default: 0 },
   },
   { _id: false },
 );
@@ -56,6 +59,8 @@ const UserSchema = new Schema<IUser>(
     password: { type: String, required: true },
     teachableUserId: { type: Number },
     points: { type: Number, default: 0 },
+    currentStreak: { type: Number, default: 0 },
+    lastActivityDate: { type: Date, default: null },
     gender: { type: String, enum: ["male", "female", "prefer_not_to_say", "other"], default: null },
     genderOther: { type: String, default: null },
     dateOfBirth: { type: Date, default: null },
