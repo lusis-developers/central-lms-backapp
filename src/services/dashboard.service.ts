@@ -116,7 +116,7 @@ export class DashboardService {
     // Determine Recent Courses (Top 3)
     // Priority: Most recently accessed > Most recently enrolled
     // If we have candidates, sort them.
-    let recentCandidates = [];
+    let recentCandidates: typeof candidates = [];
     if (candidates.length > 0) {
       candidates.sort((a, b) => {
         if (a.lastAccessed !== b.lastAccessed) return b.lastAccessed - a.lastAccessed;
