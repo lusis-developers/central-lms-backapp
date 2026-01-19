@@ -7,4 +7,4 @@ const dashboardRouter = Router();
 // Route now accepts userId directly: GET /api/dashboard/:userId
 dashboardRouter.get("/:userId", getDashboard);
 
-export { dashboardRouter };
+export default dashboardRouter
