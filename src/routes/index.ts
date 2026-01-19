@@ -5,7 +5,7 @@ import commentsRouter from "./comments.router";
 import gamificationRouter from "./gamification.router";
 import careersRouter from "./careers.router";
 import paymentRouter from "./payment.router";
-import { dashboardRouter } from "./dashboard.router";
+import dashboardRouter from "./dashboard.router";
 
 function routerApi(app: Application) {
   const router = express.Router();
