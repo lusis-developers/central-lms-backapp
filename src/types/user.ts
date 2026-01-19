@@ -50,6 +50,13 @@ export interface IUser {
   gender?: "male" | "female" | "prefer_not_to_say" | "other";
   genderOther?: string | null;
   dateOfBirth?: Date | null;
+  jobPosition?: string;
+  businessName?: string;
+  businessType?: "physical_restaurant" | "dark_kitchen" | "food_truck" | "catering" | "bakery" | "cafe" | "other" | null;
+  businessTypeOther?: string | null;
+  employeeCount?: "1-5" | "6-10" | "11-25" | "26-50" | "50+" | null;
+  numberOfLocations?: number;
+  onboardingCompleted?: boolean;
   heardAboutUs?:
   | "social_media_ad"
   | "friend_colleague"
