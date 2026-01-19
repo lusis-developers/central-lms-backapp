@@ -64,6 +64,21 @@ const UserSchema = new Schema<IUser>(
     gender: { type: String, enum: ["male", "female", "prefer_not_to_say", "other"], default: null },
     genderOther: { type: String, default: null },
     dateOfBirth: { type: Date, default: null },
+    jobPosition: { type: String, default: null },
+    businessName: { type: String, default: null },
+    businessType: {
+      type: String,
+      enum: ["physical_restaurant", "dark_kitchen", "food_truck", "catering", "bakery", "cafe", "other"],
+      default: null
+    },
+    businessTypeOther: { type: String, default: null },
+    employeeCount: {
+      type: String,
+      enum: ["1-5", "6-10", "11-25", "26-50", "50+"],
+      default: null
+    },
+    numberOfLocations: { type: Number, default: 0 },
+    onboardingCompleted: { type: Boolean, default: false },
     heardAboutUs: {
       type: String,
       enum: [
