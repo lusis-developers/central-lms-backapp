@@ -16,6 +16,7 @@ import {
   getQuizResponses,
   getVideoById,
   getNextVideo,
+  getPopularCourses,
 } from "../controllers/courses.controller";
 import { createQuiz, getQuizzesByCourse, getQuizByIdController, deleteQuiz, submitQuiz } from "../controllers/quizzes.controller";
 import certificatesRouter from "./certificates.router";
@@ -37,6 +38,7 @@ coursesRouter.use("/", certificatesRouter);
 // USER endpoints
 // Discover courses, enroll, consume content, and take quizzes
 coursesRouter.get("/", getCourses);
+coursesRouter.get("/popular", getPopularCourses);
 coursesRouter.get("/enrolled/:userId", getEnrolledCoursesForUser);
 coursesRouter.get("/:courseId", getCourseById);
 coursesRouter.post("/:courseId/enroll", enrollUserToCourse);

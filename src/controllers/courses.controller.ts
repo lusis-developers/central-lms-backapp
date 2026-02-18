@@ -53,6 +53,26 @@ export async function getCourses(
   }
 }
 
+
+export async function getPopularCourses(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const service = new TeachableCoursesService();
+    // Fetch 6 courses to show as "Popular" on landing page
+    const { data } = await service.listCourses({ page: 1, per: 6 });
+    res.status(HttpStatusCode.Ok).send({ message: "Popular courses retrieved successfully.", courses: data });
+    return;
+  } catch (error: any) {
+    const err = error as { status?: number; message?: string };
+    console.error("Error fetching popular courses", err);
+    res.status(err?.status || HttpStatusCode.InternalServerError).send({ message: err?.message || "Internal server error." });
+    return;
+  }
+}
+
 export async function getEnrolledCoursesForUser(
   req: Request,
   res: Response,
