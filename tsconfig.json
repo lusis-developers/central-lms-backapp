@@ -26,5 +26,9 @@
     "ignore": [
       "/node_modules/(?!@api)"
     ]
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "scripts"
+  ]
 }

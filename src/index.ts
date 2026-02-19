@@ -19,7 +19,7 @@ function getInit(): Promise<void> {
   return initPromise;
 }
 
-const { app } = createApp();
+const { app, server } = createApp();
 
 async function ensureDefaultCareer(): Promise<void> {
   try {
@@ -34,9 +34,19 @@ async function ensureDefaultCareer(): Promise<void> {
   }
 }
 
-// Vercel serverless: export handler en lugar de server.listen()
-// La DB se inicializa una vez y se reutiliza en invocaciones warm (cached)
-module.exports = async (req: any, res: any) => {
-  await getInit();
-  app(req, res);
-};
+if (process.env.VERCEL) {
+  // Vercel serverless: export handler en lugar de server.listen()
+  // La DB se inicializa una vez y se reutiliza en invocaciones warm (cached)
+  module.exports = async (req: any, res: any) => {
+    await getInit();
+    app(req, res);
+  };
+} else {
+  // Local dev: inicializar y levantar el servidor normalmente
+  const PORT = process.env.PORT || 3000;
+  getInit().then(() => {
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    });
+  });
+}
