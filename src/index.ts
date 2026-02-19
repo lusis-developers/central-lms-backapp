@@ -1,30 +1,25 @@
 import * as dotenv from "dotenv";
+dotenv.config();
+
 import createApp from "./app";
 import dbConnect from "./config/mongo";
 import { initializeSchedulers } from "./schedulers";
 import { models } from "./models";
 
-async function main() {
-  dotenv.config();
+let initPromise: Promise<void> | null = null;
 
-  await dbConnect();
-
-  await ensureDefaultCareer();
-
-  initializeSchedulers();
-
-  const { app, server } = createApp();
-
-  server.timeout = 10 * 60 * 1000;
-
-  const port: number | string = process.env.PORT || 8100;
-
-  server.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
+function getInit(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      await dbConnect();
+      await ensureDefaultCareer();
+      initializeSchedulers();
+    })();
+  }
+  return initPromise;
 }
 
-main();
+const { app } = createApp();
 
 async function ensureDefaultCareer(): Promise<void> {
   try {
@@ -38,3 +33,10 @@ async function ensureDefaultCareer(): Promise<void> {
     console.error("Error ensuring default career", error);
   }
 }
+
+// Vercel serverless: export handler en lugar de server.listen()
+// La DB se inicializa una vez y se reutiliza en invocaciones warm (cached)
+module.exports = async (req: any, res: any) => {
+  await getInit();
+  app(req, res);
+};
