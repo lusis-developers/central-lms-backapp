@@ -91,6 +91,13 @@ export class TeachableUsersService {
   }
 
   /**
+   * List users from Teachable.
+   */
+  async listUsers(metadata?: unknown): Promise<FetchResponse<any>> {
+    return this.sdk.listUsers(metadata);
+  }
+
+  /**
    * Unenroll a user from a course using user_id and course_id.
    * Returns 204 on success, 404/422 on errors.
    */

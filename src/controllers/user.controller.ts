@@ -1113,3 +1113,89 @@ export async function submitOnboarding(
     res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error." });
   }
 }
+
+export async function seedTestUser(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> {
+  try {
+    const TEST_USER = {
+      name: "Tester Nabux",
+      email: "testing@nabux.ec",
+      password: "123456789",
+      accountType: "founder",
+      onboardingCompleted: true,
+    };
+
+    let user = await models.users.findOne({ email: TEST_USER.email });
+    let action = "created";
+
+    if (user) {
+      user.name = TEST_USER.name;
+      user.password = TEST_USER.password; // Pre-save hook will hash this
+      user.accountType = "founder";
+      user.onboardingCompleted = true;
+      await user.save();
+      action = "updated";
+    } else {
+      user = await models.users.create(TEST_USER);
+    }
+
+    // Link with Teachable
+    if (!user.teachableUserId) {
+      const teachableService = new TeachableUsersService();
+      let tId: number | undefined;
+
+      // 1. Try to create
+      try {
+        const createRes = await teachableService.createUser({
+          name: TEST_USER.name,
+          email: TEST_USER.email,
+          password: TEST_USER.password
+        });
+        const r = createRes as any;
+        tId = r?.data?.id ?? r?.data?.user?.id;
+      } catch (err) {
+        console.warn("Teachable create failed (might exist), trying list...", err);
+      }
+
+      // 2. If no ID, try to list by email
+      if (!tId) {
+        try {
+          const listRes = await teachableService.listUsers({ email: TEST_USER.email });
+          const r = listRes as any;
+          // Teachable list response structure: { users: [...] } usually
+          const users = r?.data?.users ?? r?.users ?? [];
+          const found = users.find((u: any) => u.email === TEST_USER.email);
+          if (found) tId = Number(found.id);
+        } catch (err) {
+          console.error("Teachable list failed", err);
+        }
+      }
+
+      if (tId && Number.isFinite(tId)) {
+        user.teachableUserId = tId;
+        await user.save();
+        action += " & linked to Teachable";
+      }
+    }
+
+    // Auto-enroll if linked
+    if (user.teachableUserId) {
+      const enrollmentService = new EnrollmentService();
+      // We purposefully swallow errors here to avoid 500 if enroll fails but user is created
+      await enrollmentService.enrollUserInAllAvailableCourses(user._id.toString()).catch(e => console.error("Auto-enroll failed:", e));
+    }
+
+    res.status(HttpStatusCode.Ok).send({
+      message: `Test user ${action} successfully.`,
+      teachableUserId: user.teachableUserId
+    });
+    return;
+  } catch (error) {
+    console.error("Error seeding test user", error);
+    res.status(HttpStatusCode.InternalServerError).send({ message: "Internal server error seeding user." });
+    return;
+  }
+}

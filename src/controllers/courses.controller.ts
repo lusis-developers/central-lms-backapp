@@ -141,10 +141,36 @@ export async function getEnrolledCoursesForUser(
 async function resolveTeachableUserId(userId?: string, teachableUserId?: unknown): Promise<number | undefined> {
   const parsedTeachable = parsePositiveNumber(teachableUserId);
   if (parsedTeachable) return parsedTeachable;
+
   if (userId && Types.ObjectId.isValid(userId)) {
-    const user = await models.users.findById(userId).lean();
-    const id = parsePositiveNumber(user?.teachableUserId);
+    const user = await models.users.findById(userId); // Removed lean() to allow save() if needed, or we can just use updateOne
+    if (!user) return undefined;
+
+    const id = parsePositiveNumber(user.teachableUserId);
     if (id) return id;
+
+    // Self-healing: If user exists but has no teachableUserId, try to find it in Teachable by email
+    if (user.email) {
+      try {
+        const teachableService = new TeachableUsersService();
+        const listRes = await teachableService.listUsers({ email: user.email });
+        const r = listRes as any;
+        const users = r?.data?.users ?? r?.users ?? [];
+        const found = users.find((u: any) => u.email === user.email);
+
+        if (found && found.id) {
+          const tId = Number(found.id);
+          if (Number.isFinite(tId)) {
+            // Save it for future
+            user.teachableUserId = tId;
+            await user.save();
+            return tId;
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to self-heal teachableUserId for user ${user.email}`, err);
+      }
+    }
   }
   return undefined;
 }
@@ -463,6 +489,17 @@ export async function getCourseProgressForUser(
     const { teachableUserId, page, per } = (req.query || {}) as Record<string, any>;
     const finalTeachableUserId = await resolveTeachableUserId(userId, teachableUserId);
     if (!finalTeachableUserId) {
+      // Graceful fallback for founders: return empty progress instead of 400
+      if (userId && Types.ObjectId.isValid(userId)) {
+        const userCheck = await models.users.findById(userId).lean();
+        if (userCheck && userCheck.accountType === "founder") {
+          res.status(HttpStatusCode.Ok).send({
+            message: "Course progress retrieved successfully.",
+            progress: { percent_complete: 0, completed: 0, total: 0, lecture_sections: [] },
+          });
+          return;
+        }
+      }
       res.status(HttpStatusCode.BadRequest).send({ message: "Invalid payload. A valid teachableUserId or userId is required." });
       return;
     }

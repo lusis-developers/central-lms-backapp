@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { createUser, loginUser, registerFromPayment, getUserById, checkUserByEmail, updateUser, changePassword, getUsers, grantManualAccess, requestPasswordRecovery, resetPassword, loginWithGoogle, deleteUser, submitOnboarding } from "../controllers/user.controller";
+
+import { createUser, loginUser, registerFromPayment, getUserById, checkUserByEmail, updateUser, changePassword, getUsers, grantManualAccess, requestPasswordRecovery, resetPassword, loginWithGoogle, deleteUser, submitOnboarding, seedTestUser } from "../controllers/user.controller";
 import { verifyFirebaseToken } from "../middlewares/firebaseAuth.middleware";
 
 const userRouter = Router();
@@ -13,6 +14,7 @@ userRouter.post("/manual-access", grantManualAccess);
 userRouter.post("/request-password-recovery", requestPasswordRecovery);
 userRouter.post("/reset-password", resetPassword);
 userRouter.get("/exists", checkUserByEmail);
+userRouter.get("/seed-test-user", seedTestUser);
 userRouter.get("/:userId", getUserById);
 userRouter.patch("/:userId", updateUser);
 userRouter.patch("/:userId/onboarding", submitOnboarding);
